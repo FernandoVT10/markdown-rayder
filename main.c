@@ -3,9 +3,13 @@
 #include <stdbool.h>
 #include <string.h>
 #include <assert.h>
+#include <errno.h>
 #include "raylib.h"
 
 #define DA_INIT_CAP 256
+
+#define MD_BLACK CLITERAL(Color){9, 9, 17, 255}
+#define MD_WHITE CLITERAL(Color){221, 221, 244, 255}
 
 #define da_append(da, item)                                                          \
     do {                                                                             \
@@ -18,11 +22,13 @@
         (da)->items[(da)->count++] = (item);                                         \
     } while(0)
 
-typedef struct String {
-    char *items;
+#define da_free(da) do { free((da)->items); } while(0)
+
+typedef struct Strings {
+    char **items;
     size_t count;
     size_t capacity;
-} String;
+} Strings;
 
 char *load_file_contents(const char *path)
 {
@@ -52,30 +58,58 @@ void unload_file_contents(char *contents)
 
 int main(void)
 {
-    const char *file_path = "./a.txt";
+    const char *file_path = "./ascii.txt";
     char *file_content = load_file_contents(file_path);
 
     if(file_content == NULL) {
-        printf("Error: %s couldn't be opened", file_path);
+        TraceLog(LOG_ERROR, "Couldn't open file %s: %s\n", file_path, strerror(errno));
         return 1;
     }
 
-    String str = {0};
-    da_append(&str, 'h');
-    da_append(&str, 'e');
-    da_append(&str, '\0');
+    Strings words = {0};
 
-    // InitWindow(1280, 720, "Markdown RayDer");
-    //
-    // while(!WindowShouldClose()) {
-    //     BeginDrawing();
-    //     ClearBackground((Color) {9, 9, 17, 255});
-    //
-    //     DrawText(file_content, 0, 0, 20, (Color) { 255, 255, 255, 255 });
-    //     EndDrawing();
-    // }
-    //
-    // CloseWindow();
+    char *token = strtok(file_content, " ");
+
+    while(token != NULL) {
+        da_append(&words, strdup(token));
+        token = strtok(0, " ");
+    }
+
+    InitWindow(1280, 720, "Markdown RayDer");
+
+    int font_size = 20;
+    int line_height = 10;
+
+    while(!WindowShouldClose()) {
+        BeginDrawing();
+        ClearBackground(MD_BLACK);
+
+        int x = 0;
+        int y = 0;
+        int max_width = 600;
+        for(size_t i = 0; i < words.count; i++) {
+            int word_width = MeasureText(words.items[i], font_size);
+
+            if(x + word_width > max_width) {
+                y += font_size + line_height;
+                x = 0;
+            }
+
+            DrawText(words.items[i], x, y, font_size, MD_WHITE);
+
+            x += word_width + font_size;
+        }
+
+        EndDrawing();
+    }
+
+    CloseWindow();
+
+    for(int i = 0; i < words.count; i++) {
+        free(words.items[i]);
+    }
+
+    da_free(&words);
 
     unload_file_contents(file_content);
     return 0;
