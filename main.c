@@ -11,6 +11,13 @@
 #define MD_BLACK CLITERAL(Color){9, 9, 17, 255}
 #define MD_WHITE CLITERAL(Color){221, 221, 244, 255}
 
+#define HEADER_1_FONT_SIZE 35
+#define HEADER_2_FONT_SIZE 32
+#define HEADER_3_FONT_SIZE 29
+#define HEADER_4_FONT_SIZE 26
+#define HEADER_5_FONT_SIZE 23
+#define HEADER_6_FONT_SIZE 20
+
 #define da_append(da, item)                                                          \
     do {                                                                             \
         if((da)->count >= (da)->capacity) {                                          \
@@ -53,6 +60,13 @@ typedef struct Tokens {
     size_t capacity;
 } Tokens;
 
+typedef struct Lexer {
+    char *buf;
+    int cursor;
+} Lexer;
+
+Lexer lexer = {0};
+
 char *load_file_contents(const char *path)
 {
     FILE *file = fopen(path, "r");
@@ -74,9 +88,41 @@ char *load_file_contents(const char *path)
     return text;
 }
 
-void unload_file_contents(char *contents)
+bool lexer_init(const char *file_path)
 {
-    free(contents);
+    lexer.buf = load_file_contents(file_path);
+    lexer.cursor = 0;
+
+    if(!lexer.buf) {
+        TraceLog(LOG_ERROR, "Couldn't open file %s: %s\n", file_path, strerror(errno));
+        return false;
+    }
+
+    return true;
+}
+
+char lexer_get_char(int pos)
+{
+    if(pos >= strlen(lexer.buf)) {
+        return '\0';
+    }
+
+    return lexer.buf[pos];
+}
+
+char lexer_get_and_advance()
+{
+    return lexer_get_char(lexer.cursor++);
+}
+
+char lexer_peek_n_char(int n)
+{
+    return lexer_get_char(lexer.cursor + n);
+}
+
+void lexer_advance()
+{
+    lexer.cursor++;
 }
 
 enum TokenType get_header_type(int level)
@@ -99,57 +145,88 @@ enum TokenType get_header_type(int level)
     }
 }
 
-int main(void)
+Tokens lexer_scan_tokens()
 {
-    const char *file_path = "./examples/header.md";
-    char *file_content = load_file_contents(file_path);
-
-    if(file_content == NULL) {
-        TraceLog(LOG_ERROR, "Couldn't open file %s: %s\n", file_path, strerror(errno));
-        return 1;
-    }
-
     Tokens tokens = {0};
 
-    for(int i = 0; i < strlen(file_content); i++) {
-        char c = file_content[i];
-
+    char c;
+    while((c = lexer_get_and_advance())) {
         if(c == '#') {
+            int level = 1;
+
+            while(lexer_peek_n_char(level - 1) == '#') level++;
+
+            if(lexer_peek_n_char(level - 1) != ' ') {
+                while(lexer_get_and_advance() != '\n');
+                continue;
+            }
+
+            lexer.cursor += level;
+
+            int start_pos = lexer.cursor;
+
+            while(lexer_get_and_advance() != '\n');
+
+            Token token = {
+                .type = get_header_type(level),
+                .lexeme = strndup(lexer.buf + start_pos, lexer.cursor - start_pos - 1),
+            };
+
+            da_append(&tokens, token);
         }
     }
 
-    Strings words = {0};
+    return tokens;
+}
 
-    char *token = strtok(file_content, " ");
+int main(void)
+{
+    const char *file_path = "./examples/header.md";
 
-    while(token != NULL) {
-        da_append(&words, strdup(token));
-        token = strtok(0, " ");
+    if(!lexer_init(file_path)) {
+        return 1;
     }
 
-    InitWindow(1280, 720, "Markdown RayDer");
+    Tokens tokens = lexer_scan_tokens();
+    TraceLog(LOG_INFO, "Number of lexed tokens: %lu", tokens.count);
 
-    int font_size = 20;
-    int line_height = 10;
+    InitWindow(1280, 720, "Markdown RayDer");
 
     while(!WindowShouldClose()) {
         BeginDrawing();
         ClearBackground(MD_BLACK);
 
-        int x = 0;
         int y = 0;
-        int max_width = 600;
-        for(size_t i = 0; i < words.count; i++) {
-            int word_width = MeasureText(words.items[i], font_size);
 
-            if(x + word_width > max_width) {
-                y += font_size + line_height;
-                x = 0;
+        for(size_t i = 0; i < tokens.count; i++) {
+            Token token = tokens.items[i];
+
+            int font_size = 0;
+
+            switch(token.type) {
+                case HEADER_1:
+                    font_size = HEADER_1_FONT_SIZE;
+                    break;
+                case HEADER_2:
+                    font_size = HEADER_2_FONT_SIZE;
+                    break;
+                case HEADER_3:
+                    font_size = HEADER_3_FONT_SIZE;
+                    break;
+                case HEADER_4:
+                    font_size = HEADER_4_FONT_SIZE;
+                    break;
+                case HEADER_5:
+                    font_size = HEADER_5_FONT_SIZE;
+                    break;
+                case HEADER_6:
+                    font_size = HEADER_6_FONT_SIZE;
+                    break;
+                default: continue;
             }
 
-            DrawText(words.items[i], x, y, font_size, MD_WHITE);
-
-            x += word_width + font_size;
+            DrawText(token.lexeme, 0, y, font_size, MD_WHITE);
+            y += font_size;
         }
 
         EndDrawing();
@@ -157,12 +234,5 @@ int main(void)
 
     CloseWindow();
 
-    for(int i = 0; i < words.count; i++) {
-        free(words.items[i]);
-    }
-
-    da_free(&words);
-
-    unload_file_contents(file_content);
     return 0;
 }
