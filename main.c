@@ -24,11 +24,34 @@
 
 #define da_free(da) do { free((da)->items); } while(0)
 
+#define UNREACHABLE(message) do { fprintf(stderr, "%s:%d: UNREACHABLE: %s\n", __FILE__, __LINE__, message); abort(); } while(0)
+
 typedef struct Strings {
     char **items;
     size_t count;
     size_t capacity;
 } Strings;
+
+enum TokenType {
+    HEADER_1,
+    HEADER_2,
+    HEADER_3,
+    HEADER_4,
+    HEADER_5,
+    HEADER_6,
+    NEWLINE
+};
+
+typedef struct Token {
+    enum TokenType type;
+    char *lexeme;
+} Token;
+
+typedef struct Tokens {
+    Token *items;
+    size_t count;
+    size_t capacity;
+} Tokens;
 
 char *load_file_contents(const char *path)
 {
@@ -56,14 +79,43 @@ void unload_file_contents(char *contents)
     free(contents);
 }
 
+enum TokenType get_header_type(int level)
+{
+    switch(level) {
+        case 1:
+            return HEADER_1;
+        case 2:
+            return HEADER_2;
+        case 3:
+            return HEADER_3;
+        case 4:
+            return HEADER_4;
+        case 5:
+            return HEADER_5;
+        case 6:
+            return HEADER_6;
+        default:
+            UNREACHABLE("tried to get a header level greater than 6");
+    }
+}
+
 int main(void)
 {
-    const char *file_path = "./ascii.txt";
+    const char *file_path = "./examples/header.md";
     char *file_content = load_file_contents(file_path);
 
     if(file_content == NULL) {
         TraceLog(LOG_ERROR, "Couldn't open file %s: %s\n", file_path, strerror(errno));
         return 1;
+    }
+
+    Tokens tokens = {0};
+
+    for(int i = 0; i < strlen(file_content); i++) {
+        char c = file_content[i];
+
+        if(c == '#') {
+        }
     }
 
     Strings words = {0};
