@@ -20,8 +20,6 @@ typedef struct String {
 
 typedef struct MDText {
     int line;
-    int start_col;
-    int end_col;
     int font_size;
     char *text;
     bool italic;
@@ -60,10 +58,10 @@ MDTexts get_md_texts()
 
     Token token = lexer_next_token();
     int line = 0;
-    int col = 0;
     int font_size = DEFAULT_FONT_SIZE;
     bool bold = false;
     bool italic = false;
+
     while(token.type != END_OF_FILE) {
         switch(token.type) {
             case HEADER_1:
@@ -75,22 +73,16 @@ MDTexts get_md_texts()
                 font_size = get_header_font_size(token.type);
                 break;
             case TEXT: {
-                int text_len = strlen(token.lexeme);
                 da_append(&texts, ((MDText) {
                     .line = line,
-                    .start_col = col,
-                    .end_col = col + text_len,
                     .font_size = font_size,
                     .text = strdup(token.lexeme),
                     .italic = italic,
                     .bold = bold,
                 }));
-
-                col += text_len;
             } break;
             case NEWLINE: {
                 line++;
-                col = 0;
                 font_size = DEFAULT_FONT_SIZE;
                 italic = false;
                 bold = false;
@@ -124,18 +116,13 @@ void free_md_texts(MDTexts texts)
 
 int main(void)
 {
-    const char *file_path = "./examples/emphasis.md";
+    const char *file_path = "./examples/paragraphs.md";
 
     if(!lexer_init(file_path)) {
         return 1;
     }
 
     MDTexts texts = get_md_texts();
-
-    for(size_t i = 0; i < texts.count; i++) {
-        MDText mdText = texts.items[i];
-        printf("Draw Text \"%s\" with font size %u at line %u and col %u with italic: %u bold: %u\n", mdText.text, mdText.font_size, mdText.line, mdText.start_col, mdText.italic, mdText.bold);
-    }
 
     InitWindow(1280, 720, "Markdown RayDer");
 
@@ -177,10 +164,24 @@ int main(void)
 
             float spacing = 2.0f;
 
-            DrawTextEx(font, mdText.text, pos, mdText.font_size, spacing, color);
+            char *str = strdup(mdText.text);
+            char *token;
+            int screen_width = GetScreenWidth();
+            while((token = strsep(&str, " "))) {
+                Vector2 size = MeasureTextEx(font, token, mdText.font_size, spacing);
 
-            Vector2 size = MeasureTextEx(font, mdText.text, mdText.font_size, spacing);
-            pos.x += size.x;
+                if(pos.x + size.x > screen_width) {
+                    pos.x = 0;
+                    pos.y += size.y;
+                }
+
+                DrawTextEx(font, token, pos, mdText.font_size, spacing, color);
+                pos.x += size.x + 10;
+            }
+            free(str);
+
+            // DrawTextEx(font, mdText.text, pos, mdText.font_size, spacing, color);
+
         }
 
 

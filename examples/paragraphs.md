@@ -4,6 +4,4 @@ ASCII 6 an acronym for American Standard Code for Information Interchange, is a 
 
 The Internet Assigned Numbers Authority (IANA) prefers the name US-ASCII for this character encoding.
 
-
-
 ASCII is one of the IEEE milestones.
