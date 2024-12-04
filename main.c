@@ -113,6 +113,15 @@ MDTexts get_md_texts()
     return texts;
 }
 
+void free_md_texts(MDTexts texts)
+{
+    for(size_t i = 0; i < texts.count; i++) {
+        free(texts.items[i].text);
+    }
+
+    free(texts.items);
+}
+
 int main(void)
 {
     const char *file_path = "./examples/emphasis.md";
@@ -185,11 +194,7 @@ int main(void)
 
     CloseWindow();
 
-    for(size_t i = 0; i < texts.count; i++) {
-        free(texts.items[i].text);
-    }
-
-    free(texts.items);
+    free_md_texts(texts);
 
     return 0;
 }
