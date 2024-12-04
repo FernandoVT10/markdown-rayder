@@ -4,12 +4,13 @@
 #define MD_BLACK CLITERAL(Color){9, 9, 17, 255}
 #define MD_WHITE CLITERAL(Color){221, 221, 244, 255}
 
-#define HEADER_1_FONT_SIZE 35
-#define HEADER_2_FONT_SIZE 32
-#define HEADER_3_FONT_SIZE 29
-#define HEADER_4_FONT_SIZE 26
-#define HEADER_5_FONT_SIZE 23
-#define HEADER_6_FONT_SIZE 20
+#define DEFAULT_FONT_SIZE 20
+#define HEADER_1_FONT_SIZE 40
+#define HEADER_2_FONT_SIZE 37
+#define HEADER_3_FONT_SIZE 34
+#define HEADER_4_FONT_SIZE 33
+#define HEADER_5_FONT_SIZE 30
+#define HEADER_6_FONT_SIZE 27
 
 typedef struct String {
     char *items;
@@ -53,20 +54,14 @@ int get_header_font_size(enum TokenType type)
     }
 }
 
-int main(void)
+MDTexts get_md_texts()
 {
-    const char *file_path = "./examples/emphasis.md";
-
-    if(!lexer_init(file_path)) {
-        return 1;
-    }
-
     MDTexts texts = {0};
 
     Token token = lexer_next_token();
     int line = 0;
     int col = 0;
-    int font_size = 16;
+    int font_size = DEFAULT_FONT_SIZE;
     bool bold = false;
     bool italic = false;
     while(token.type != END_OF_FILE) {
@@ -96,7 +91,7 @@ int main(void)
             case NEWLINE: {
                 line++;
                 col = 0;
-                font_size = 16;
+                font_size = DEFAULT_FONT_SIZE;
                 italic = false;
                 bold = false;
             } break;
@@ -115,48 +110,78 @@ int main(void)
 
     lexer_free_token(token);
 
+    return texts;
+}
+
+int main(void)
+{
+    const char *file_path = "./examples/emphasis.md";
+
+    if(!lexer_init(file_path)) {
+        return 1;
+    }
+
+    MDTexts texts = get_md_texts();
+
     for(size_t i = 0; i < texts.count; i++) {
         MDText mdText = texts.items[i];
         printf("Draw Text \"%s\" with font size %u at line %u and col %u with italic: %u bold: %u\n", mdText.text, mdText.font_size, mdText.line, mdText.start_col, mdText.italic, mdText.bold);
     }
 
-
     InitWindow(1280, 720, "Markdown RayDer");
+
+    int load_font_size = 72;
+
+    Font font_regular = LoadFontEx("./fonts/Poppins-Regular.ttf", load_font_size, NULL, 0);
+    Font font_bold = LoadFontEx("./fonts/Poppins-Bold.ttf", load_font_size, NULL, 0);
+    Font font_italic = LoadFontEx("./fonts/Poppins-Italic.ttf", load_font_size, NULL, 0);
+    Font font_bold_italic = LoadFontEx("./fonts/Poppins-BoldItalic.ttf", load_font_size, NULL, 0);
 
     while(!WindowShouldClose()) {
         BeginDrawing();
         ClearBackground(MD_BLACK);
 
-        int x = 0;
-        int y = 0;
+        Vector2 pos = {0};
         int cur_line = 0;
 
         for(size_t i = 0; i < texts.count; i++) {
             MDText mdText = texts.items[i];
 
             if(cur_line < mdText.line && i > 0) {
-                x = 0;
-                y += texts.items[i - 1].font_size * (mdText.line - cur_line);
+                pos.x = 0;
+                pos.y += texts.items[i - 1].font_size * (mdText.line - cur_line);
                 cur_line = mdText.line;
             }
 
+            Font font = font_regular;
             Color color = MD_WHITE;
 
             if(mdText.bold && mdText.italic) {
-                color = GREEN;
+                font = font_bold_italic;
+                color = SKYBLUE;
             } else if(mdText.italic) {
-                color = PINK;
+                font = font_italic;
             } else if(mdText.bold) {
+                font = font_bold;
                 color = SKYBLUE;
             }
 
-            DrawText(mdText.text, x, y, mdText.font_size, color);
-            x += MeasureText(mdText.text, mdText.font_size);
+            float spacing = 2.0f;
+
+            DrawTextEx(font, mdText.text, pos, mdText.font_size, spacing, color);
+
+            Vector2 size = MeasureTextEx(font, mdText.text, mdText.font_size, spacing);
+            pos.x += size.x;
         }
 
 
         EndDrawing();
     }
+
+    UnloadFont(font_regular);
+    UnloadFont(font_bold);
+    UnloadFont(font_italic);
+    UnloadFont(font_bold_italic);
 
     CloseWindow();
 
