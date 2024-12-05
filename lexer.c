@@ -92,7 +92,7 @@ bool is_special_char(char c)
     return c == '#' || c == '\n' || c == '\0' || c == '*';
 }
 
-Token lexer_next_token()
+void lexer_process_next_token()
 {
     char c = lexer_get_and_advance();
 
@@ -104,14 +104,16 @@ Token lexer_next_token()
         if(lexer_peek_n_char(level - 1) == ' ') {
             lexer.cursor += level;
 
-            return ((Token) {
-                .type = get_header_type(level),
-                .lexeme = NULL,
-            });
+            lexer.token.type = get_header_type(level);
+            lexer.token.lexeme.count = 0;
+            return;
         }
     }
 
     if(c == '\n') {
+        lexer.token.type = NEWLINE;
+
+        return;
         return ((Token) {
             .type = NEWLINE,
             .lexeme = NULL,

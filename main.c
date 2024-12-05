@@ -12,12 +12,6 @@
 #define HEADER_5_FONT_SIZE 30
 #define HEADER_6_FONT_SIZE 27
 
-typedef struct String {
-    char *items;
-    size_t count;
-    size_t capacity;
-} String;
-
 typedef struct MDText {
     int line;
     int font_size;
@@ -48,7 +42,7 @@ int get_header_font_size(enum TokenType type)
         case HEADER_6:
             return HEADER_6_FONT_SIZE;
         default:
-            return 16;
+            return DEFAULT_FONT_SIZE;
     }
 }
 

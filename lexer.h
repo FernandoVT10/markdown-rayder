@@ -26,6 +26,12 @@
 
 #define UNREACHABLE(message) do { fprintf(stderr, "%s:%d: UNREACHABLE: %s\n", __FILE__, __LINE__, message); abort(); } while(0)
 
+typedef struct String {
+    char *items;
+    size_t count;
+    size_t capacity;
+} String;
+
 enum TokenType {
     HEADER_1,
     HEADER_2,
@@ -42,13 +48,13 @@ enum TokenType {
 
 typedef struct Token {
   enum TokenType type;
-  char *lexeme;
+  String *lexeme;
 } Token;
 
 typedef struct Lexer {
     char *buf;
     int cursor;
-    Token prev_token;
+    Token token;
 } Lexer;
 
 bool lexer_init(const char *file_path);
