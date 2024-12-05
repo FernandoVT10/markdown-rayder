@@ -44,11 +44,12 @@ enum TokenType {
     END_OF_FILE,
     ITALIC,
     BOLD,
+    CODE,
 };
 
 typedef struct Token {
   enum TokenType type;
-  String *lexeme;
+  String lexeme;
 } Token;
 
 typedef struct Lexer {
@@ -58,7 +59,7 @@ typedef struct Lexer {
 } Lexer;
 
 bool lexer_init(const char *file_path);
-Token lexer_next_token();
-void lexer_free_token(Token token);
+Token *lexer_next_token();
+void lexer_destroy();
 
 #endif
