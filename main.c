@@ -8,11 +8,11 @@
 
 #define DEFAULT_FONT_SIZE 20
 #define HEADER_1_FONT_SIZE 40
-#define HEADER_2_FONT_SIZE 37
-#define HEADER_3_FONT_SIZE 34
-#define HEADER_4_FONT_SIZE 33
-#define HEADER_5_FONT_SIZE 30
-#define HEADER_6_FONT_SIZE 27
+#define HEADER_2_FONT_SIZE 35
+#define HEADER_3_FONT_SIZE 30
+#define HEADER_4_FONT_SIZE 25
+#define HEADER_5_FONT_SIZE 20
+#define HEADER_6_FONT_SIZE 15
 
 typedef struct MDText {
     int line;
@@ -206,7 +206,7 @@ Vector2 draw_text(Vector2 pos, int start_bound, int end_bound, MDText mdText)
 
 int main(void)
 {
-    const char *file_path = "./examples/paragraphs.md";
+    const char *file_path = "./example.md";
 
     assert(lexer_init(file_path));
     MDTexts texts = get_md_texts();
