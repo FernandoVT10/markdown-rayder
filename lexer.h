@@ -55,6 +55,8 @@ typedef struct Token {
 typedef struct Lexer {
     char *buf;
     int cursor;
+    size_t token_count;
+    Token prev_token;
     Token token;
 } Lexer;
 

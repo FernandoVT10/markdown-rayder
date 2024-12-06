@@ -206,7 +206,7 @@ Vector2 draw_text(Vector2 pos, int start_bound, int end_bound, MDText mdText)
 
 int main(void)
 {
-    const char *file_path = "./example.md";
+    const char *file_path = "./examples/partial-example.md";
 
     assert(lexer_init(file_path));
     MDTexts texts = get_md_texts();
@@ -216,9 +216,29 @@ int main(void)
 
     load_fonts();
 
+    Vector2 camera = {0};
+    camera.x = 20;
 
     while(!WindowShouldClose()) {
         int screen_width = GetScreenWidth();
+        int scroll_speed = 500;
+
+        float dt = GetFrameTime();
+
+        if(IsKeyDown(KEY_DOWN)) {
+            camera.y -= scroll_speed * dt;
+        } else if(IsKeyDown(KEY_UP)) {
+            camera.y += scroll_speed * dt;
+
+            if(camera.y > 0) {
+                camera.y = 0;
+            }
+        }
+
+        if(IsKeyPressed(KEY_F)) {
+            ToggleFullscreen();
+        }
+
 
         BeginDrawing();
         ClearBackground(MD_BLACK);
@@ -227,18 +247,18 @@ int main(void)
 
         int margin_top = 10;
 
-        Vector2 pos = {0};
+        Vector2 pos = camera;
 
         for(size_t i = 0; i < texts.count; i++) {
             MDText mdText = texts.items[i];
 
             if(cur_line < mdText.line && i > 0) {
-                pos.x = 0;
+                pos.x = 20;
                 pos.y += texts.items[i - 1].font_size + margin_top;
                 cur_line = mdText.line;
             }
 
-            pos = draw_text(pos, 0, screen_width, mdText);
+            pos = draw_text(pos, 20, screen_width - 20, mdText);
         }
 
 

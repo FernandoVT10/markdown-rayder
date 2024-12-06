@@ -107,11 +107,21 @@ void lexer_set_only_token_type(enum TokenType type)
     lexer.token.lexeme.count = 0;
 }
 
+bool lexer_is_first_token()
+{
+    return lexer.token_count == 0;
+}
+
+bool lexer_is_prev_token(enum TokenType type)
+{
+    return lexer.prev_token.type == type;
+}
+
 void lexer_process_next_token()
 {
     char c = lexer_get_and_advance();
 
-    if(c == '#') {
+    if(c == '#' && (lexer_is_prev_token(NEWLINE) || lexer_is_first_token())) {
         int level = 1;
 
         while(lexer_peek_n_char(level - 1) == '#') level++;
@@ -167,6 +177,7 @@ void lexer_process_next_token()
 
     int start_pos = lexer.cursor - 1;
 
+    c = lexer_get_and_advance();
     while(!is_special_char(c)) {
         c = lexer_get_and_advance();
     }
@@ -179,15 +190,19 @@ void lexer_process_next_token()
 
 Token *lexer_next_token()
 {
+    if(lexer.token_count > 0) {
+        lexer.prev_token.type = lexer.token.type;
+    }
     lexer_process_next_token();
+    lexer.token_count++;
     return &lexer.token;
 }
 
 void lexer_destroy()
 {
-    assert(lexer.buf != NULL);
-    assert(lexer.token.lexeme.items != NULL);
+    if(lexer.buf != NULL)
+        free(lexer.buf);
 
-    free(lexer.buf);
-    free(lexer.token.lexeme.items);
+    da_free(&lexer.token.lexeme);
+    da_free(&lexer.prev_token.lexeme);
 }
