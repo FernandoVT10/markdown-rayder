@@ -39,7 +39,7 @@ bool lexer_init(const char *file_path)
 char lexer_get_char(int pos)
 {
     if(pos >= strlen(lexer.buf)) {
-        return '\0';
+        return EOF;
     }
 
     return lexer.buf[pos];
@@ -89,10 +89,25 @@ enum TokenType get_header_type(int level)
 
 bool is_special_char(char c)
 {
-    return c == '#' || c == '\n' || c == '\0' || c == '*';
+    return c == '#' || c == '\n' || c == EOF || c == '*' || c == '`';
 }
 
-Token lexer_next_token()
+void copy_buf_to_string(String *str, char *buf, size_t buf_size)
+{
+    str->count = 0;
+    for(size_t i = 0; i < buf_size; i++) {
+        da_append(str, buf[i]);
+    }
+    da_append(str, '\0');
+}
+
+void lexer_set_only_token_type(enum TokenType type)
+{
+    lexer.token.type = type;
+    lexer.token.lexeme.count = 0;
+}
+
+void lexer_process_next_token()
 {
     char c = lexer_get_and_advance();
 
@@ -103,42 +118,51 @@ Token lexer_next_token()
 
         if(lexer_peek_n_char(level - 1) == ' ') {
             lexer.cursor += level;
-
-            return ((Token) {
-                .type = get_header_type(level),
-                .lexeme = NULL,
-            });
+            lexer_set_only_token_type(get_header_type(level));
+            return;
         }
     }
 
     if(c == '\n') {
-        return ((Token) {
-            .type = NEWLINE,
-            .lexeme = NULL,
-        });
+        lexer_set_only_token_type(NEWLINE);
+        return;
     }
 
-    if(c == '\0') {
-        return ((Token) {
-            .type = END_OF_FILE,
-            .lexeme = NULL,
-        });
+    if(c == EOF) {
+        lexer_set_only_token_type(END_OF_FILE);
+        return;
     }
 
     if(c == '*') {
         if(lexer_peek_n_char(0) == '*') {
             lexer_advance();
 
-            return ((Token) {
-                .type = BOLD,
-                .lexeme = NULL,
-            });
+            lexer_set_only_token_type(BOLD);
+            return;
         }
 
-        return ((Token) {
-            .type = ITALIC,
-            .lexeme = NULL,
-        });
+        lexer_set_only_token_type(ITALIC);
+        return;
+    }
+
+    if(c == '`') {
+        lexer.token.type = CODE;
+
+        int start_pos = lexer.cursor;
+
+        c = lexer_get_and_advance();
+
+        while(c != '`' && c != '\n' && c != EOF) {
+            c = lexer_get_and_advance();
+        }
+
+        copy_buf_to_string(&lexer.token.lexeme, lexer.buf + start_pos, lexer.cursor - start_pos - 1);
+
+        if(c != '`') {
+            // we rewind either the \n or EOF
+            lexer_rewind(1);
+        }
+        return;
     }
 
     int start_pos = lexer.cursor - 1;
@@ -149,14 +173,21 @@ Token lexer_next_token()
 
     lexer_rewind(1);
 
-    return ((Token) {
-        .type = TEXT,
-        .lexeme = strndup(lexer.buf + start_pos, lexer.cursor - start_pos),
-    });
+    lexer.token.type = TEXT;
+    copy_buf_to_string(&lexer.token.lexeme, lexer.buf + start_pos, lexer.cursor - start_pos);
 }
 
-void lexer_free_token(Token token)
+Token *lexer_next_token()
 {
-    if(token.lexeme == NULL) return;
-    free(token.lexeme);
+    lexer_process_next_token();
+    return &lexer.token;
+}
+
+void lexer_destroy()
+{
+    assert(lexer.buf != NULL);
+    assert(lexer.token.lexeme.items != NULL);
+
+    free(lexer.buf);
+    free(lexer.token.lexeme.items);
 }
