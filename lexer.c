@@ -89,7 +89,7 @@ enum TokenType get_header_type(int level)
 
 bool is_special_char(char c)
 {
-    return c == '#' || c == '\n' || c == EOF || c == '*' || c == '`';
+    return c == '#' || c == '\n' || c == EOF || c == '*' || c == '`' || c == '_';
 }
 
 void copy_buf_to_string(String *str, char *buf, size_t buf_size)
@@ -143,8 +143,21 @@ void lexer_process_next_token()
         return;
     }
 
-    if(c == '*') {
-        if(lexer_peek_n_char(0) == '*') {
+    // It's important for this to be before of the bold & italic check
+    if(c == '*' && (lexer_is_prev_token(NEWLINE) || lexer_is_first_token())) {
+        if(lexer_peek_n_char(0) == ' ') {
+            lexer_advance(1);
+
+            lexer.token.type = LIST_ITEM;
+            lexer.token.lexeme.count = 0;
+            da_append(&lexer.token.lexeme, 'o');
+            da_append(&lexer.token.lexeme, '\0');
+            return;
+        }
+    }
+
+    if(c == '*' || c == '_') {
+        if((c == '*' && lexer_peek_n_char(0) == '*') || (c == '_' && lexer_peek_n_char(0) == '_')) {
             lexer_advance();
 
             lexer_set_only_token_type(BOLD);

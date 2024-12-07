@@ -45,6 +45,7 @@ enum TokenType {
     ITALIC,
     BOLD,
     CODE,
+    LIST_ITEM,
 };
 
 typedef struct Token {
@@ -61,6 +62,7 @@ typedef struct Lexer {
 } Lexer;
 
 bool lexer_init(const char *file_path);
+bool lexer_is_prev_token(enum TokenType type);
 Token *lexer_next_token();
 void lexer_destroy();
 

@@ -7,12 +7,18 @@
 #define MD_TRANSPARENT CLITERAL(Color){0}
 
 #define DEFAULT_FONT_SIZE 20
-#define HEADER_1_FONT_SIZE 40
-#define HEADER_2_FONT_SIZE 35
-#define HEADER_3_FONT_SIZE 30
-#define HEADER_4_FONT_SIZE 25
-#define HEADER_5_FONT_SIZE 20
-#define HEADER_6_FONT_SIZE 15
+#define HEADER_1_FONT_SIZE 45
+#define HEADER_2_FONT_SIZE 40
+#define HEADER_3_FONT_SIZE 35
+#define HEADER_4_FONT_SIZE 30
+#define HEADER_5_FONT_SIZE 25
+#define HEADER_6_FONT_SIZE 20
+
+enum MDTextStyle {
+    STYLE_NORMAL,
+    STYLE_LIST,
+    STYLE_CODE,
+};
 
 typedef struct MDText {
     int line;
@@ -20,8 +26,7 @@ typedef struct MDText {
     char *text;
     bool italic;
     bool bold;
-    Color color;
-    Color bg;
+    enum MDTextStyle style;
 } MDText;
 
 typedef struct MDTexts {
@@ -68,13 +73,11 @@ MDTexts get_md_texts()
     MDTexts texts = {0};
 
     Token *token = lexer_next_token();
-    enum TokenType prev_token_type;
 
     int line = 0;
     int font_size = DEFAULT_FONT_SIZE;
     bool bold = false;
     bool italic = false;
-    Color color = MD_WHITE;
 
     while(token->type != END_OF_FILE) {
         switch(token->type) {
@@ -83,9 +86,9 @@ MDTexts get_md_texts()
             case HEADER_3:
             case HEADER_4:
             case HEADER_5:
-            case HEADER_6:
+            case HEADER_6: {
                 font_size = get_header_font_size(token->type);
-                break;
+            } break;
             case TEXT: {
                 da_append(&texts, ((MDText) {
                     .line = line,
@@ -93,40 +96,46 @@ MDTexts get_md_texts()
                     .text = strdup(token->lexeme.items),
                     .italic = italic,
                     .bold = bold,
-                    .color = color,
-                    .bg = MD_TRANSPARENT,
+                    .style = STYLE_NORMAL,
                 }));
             } break;
             case NEWLINE: {
-                if(prev_token_type == NEWLINE) break;
+                if(lexer_is_prev_token(NEWLINE)) break;
 
                 line++;
                 font_size = DEFAULT_FONT_SIZE;
                 italic = false;
                 bold = false;
-                color = MD_WHITE;
             } break;
-            case ITALIC:
+            case ITALIC: {
                 italic = !italic;
-                break;
+            } break;
             case BOLD: {
                 bold = !bold;
             } break;
-            case CODE:
+            case CODE: {
                 da_append(&texts, ((MDText) {
                     .line = line,
                     .font_size = font_size,
                     .text = strdup(token->lexeme.items),
                     .italic = italic,
                     .bold = bold,
-                    .color = SKYBLUE,
-                    .bg = MD_BLUE_BG,
+                    .style = STYLE_CODE,
                 }));
-                break;
+            } break;
+            case LIST_ITEM: {
+                da_append(&texts, ((MDText) {
+                    .line = line,
+                    .font_size = font_size,
+                    .text = strdup(token->lexeme.items),
+                    .italic = false,
+                    .bold = false,
+                    .style = STYLE_LIST,
+                }));
+            } break;
             case END_OF_FILE: UNREACHABLE("END_OF_FILE reached");
         }
 
-        prev_token_type = token->type;
         token = lexer_next_token();
     }
 
@@ -172,10 +181,24 @@ Font get_font_from_md_text(MDText mdText)
     return state.fonts.regular;
 }
 
+Color get_color_from_style(enum MDTextStyle style)
+{
+    switch(style) {
+        case STYLE_NORMAL:
+            return MD_WHITE;
+        case STYLE_LIST:
+            return PINK;
+        case STYLE_CODE:
+            return SKYBLUE;
+        default:
+            return MD_WHITE;
+    }
+}
+
 Vector2 draw_text(Vector2 pos, int start_bound, int end_bound, MDText mdText)
 {
-
     Font font = get_font_from_md_text(mdText);
+    Color color = get_color_from_style(mdText.style);
 
     char *str = strdup(mdText.text);
     char *word;
@@ -192,7 +215,7 @@ Vector2 draw_text(Vector2 pos, int start_bound, int end_bound, MDText mdText)
             pos.y += size.y;
         }
 
-        DrawTextEx(font, word, pos, mdText.font_size, spacing, mdText.color);
+        DrawTextEx(font, word, pos, mdText.font_size, spacing, color);
         pos.x += size.x + space_size;
     }
 
@@ -221,7 +244,7 @@ int main(void)
 
     while(!WindowShouldClose()) {
         int screen_width = GetScreenWidth();
-        int scroll_speed = 500;
+        int scroll_speed = 1000;
 
         float dt = GetFrameTime();
 
