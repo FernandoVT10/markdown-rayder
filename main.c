@@ -14,26 +14,18 @@
 #define HEADER_5_FONT_SIZE 25
 #define HEADER_6_FONT_SIZE 20
 
-enum MDTextStyle {
-    STYLE_NORMAL,
-    STYLE_LIST,
-    STYLE_CODE,
-};
-
-typedef struct MDText {
+typedef struct TextNode {
     int line;
     int font_size;
     char *text;
     bool italic;
     bool bold;
-    enum MDTextStyle style;
-} MDText;
+    Color color;
+} TextNode;
 
-typedef struct MDTexts {
-    MDText *items;
-    size_t count;
-    size_t capacity;
-} MDTexts;
+typedef struct ListIndicatorNode {
+    int line;
+} ListIndicatorNode;
 
 typedef struct Fonts {
     Font regular;
@@ -42,11 +34,50 @@ typedef struct Fonts {
     Font bold_italic;
 } Fonts;
 
+enum MDNodeType {
+    TEXT_NODE,
+    LIST_INDICATOR_NODE,
+};
+
+typedef struct MDNode MDNode;
+
+typedef struct MDNode {
+    enum MDNodeType type;
+    void *data;
+    MDNode *next;
+} MDNode;
+
+typedef struct MDList {
+    MDNode *head;
+    MDNode *tail;
+    size_t count;
+} MDList;
+
 typedef struct State {
     Fonts fonts;
 } State;
 
 State state = {0};
+
+void insert_end_list_item(MDList *list, enum MDNodeType type, void *data)
+{
+    MDNode *node = malloc(sizeof(MDNode));
+    node->type = type;
+    node->data = data;
+    node->next = NULL;
+
+    if(list->count > 0) {
+        MDNode *last_node = list->tail;
+
+        last_node->next = node;
+        list->tail = node;
+    } else {
+        list->head = node;
+        list->tail = node;
+    }
+
+    list->count++;
+}
 
 int get_header_font_size(enum TokenType type)
 {
@@ -68,9 +99,9 @@ int get_header_font_size(enum TokenType type)
     }
 }
 
-MDTexts get_md_texts()
+MDList get_parsed_markdown()
 {
-    MDTexts texts = {0};
+    MDList list = {0};
 
     Token *token = lexer_next_token();
 
@@ -78,6 +109,7 @@ MDTexts get_md_texts()
     int font_size = DEFAULT_FONT_SIZE;
     bool bold = false;
     bool italic = false;
+    Color color = MD_WHITE;
 
     while(token->type != END_OF_FILE) {
         switch(token->type) {
@@ -90,14 +122,16 @@ MDTexts get_md_texts()
                 font_size = get_header_font_size(token->type);
             } break;
             case TEXT: {
-                da_append(&texts, ((MDText) {
+                TextNode *text = malloc(sizeof(TextNode));
+                *text = (TextNode) {
                     .line = line,
                     .font_size = font_size,
                     .text = strdup(token->lexeme.items),
                     .italic = italic,
                     .bold = bold,
-                    .style = STYLE_NORMAL,
-                }));
+                    .color = color,
+                };
+                insert_end_list_item(&list, TEXT_NODE, text);
             } break;
             case NEWLINE: {
                 if(lexer_is_prev_token(NEWLINE)) break;
@@ -106,32 +140,31 @@ MDTexts get_md_texts()
                 font_size = DEFAULT_FONT_SIZE;
                 italic = false;
                 bold = false;
+                color = MD_WHITE;
             } break;
             case ITALIC: {
                 italic = !italic;
             } break;
             case BOLD: {
                 bold = !bold;
+                color = SKYBLUE;
             } break;
             case CODE: {
-                da_append(&texts, ((MDText) {
+                TextNode *text = malloc(sizeof(TextNode));
+                *text = (TextNode) {
                     .line = line,
                     .font_size = font_size,
                     .text = strdup(token->lexeme.items),
                     .italic = italic,
                     .bold = bold,
-                    .style = STYLE_CODE,
-                }));
+                    .color = SKYBLUE,
+                };
+                insert_end_list_item(&list, TEXT_NODE, text);
             } break;
             case LIST_ITEM: {
-                da_append(&texts, ((MDText) {
-                    .line = line,
-                    .font_size = font_size,
-                    .text = strdup(token->lexeme.items),
-                    .italic = false,
-                    .bold = false,
-                    .style = STYLE_LIST,
-                }));
+                ListIndicatorNode *node = malloc(sizeof(ListIndicatorNode));
+                node->line = line;
+                insert_end_list_item(&list, TEXT_NODE, node);
             } break;
             case END_OF_FILE: UNREACHABLE("END_OF_FILE reached");
         }
@@ -139,16 +172,12 @@ MDTexts get_md_texts()
         token = lexer_next_token();
     }
 
-    return texts;
+    return list;
 }
 
-void free_md_texts(MDTexts texts)
+void free_md_list(MDList list)
 {
-    for(size_t i = 0; i < texts.count; i++) {
-        free(texts.items[i].text);
-    }
-
-    free(texts.items);
+    // TODO
 }
 
 void load_fonts()
@@ -168,54 +197,39 @@ void unload_fonts()
     UnloadFont(state.fonts.bold_italic);
 }
 
-Font get_font_from_md_text(MDText mdText)
+Font get_font_from_text_node(TextNode *text)
 {
-    if(mdText.bold && mdText.italic) {
+    if(text->bold && text->italic) {
         return state.fonts.bold_italic;
-    } else if(mdText.italic) {
+    } else if(text->italic) {
         return state.fonts.italic;
-    } else if(mdText.bold) {
+    } else if(text->bold) {
         return state.fonts.bold;
     }
 
     return state.fonts.regular;
 }
 
-Color get_color_from_style(enum MDTextStyle style)
+Vector2 draw_text_node(Vector2 pos, int start_bound, int end_bound, TextNode *node)
 {
-    switch(style) {
-        case STYLE_NORMAL:
-            return MD_WHITE;
-        case STYLE_LIST:
-            return PINK;
-        case STYLE_CODE:
-            return SKYBLUE;
-        default:
-            return MD_WHITE;
-    }
-}
+    Font font = get_font_from_text_node(node);
 
-Vector2 draw_text(Vector2 pos, int start_bound, int end_bound, MDText mdText)
-{
-    Font font = get_font_from_md_text(mdText);
-    Color color = get_color_from_style(mdText.style);
-
-    char *str = strdup(mdText.text);
+    char *str = strdup(node->text);
     char *word;
 
     int spacing = 2;
 
-    int space_size = mdText.font_size * 0.3;
+    int space_size = node->font_size * 0.3;
 
     while((word = strsep(&str, " "))) {
-        Vector2 size = MeasureTextEx(font, word, mdText.font_size, spacing);
+        Vector2 size = MeasureTextEx(font, word, node->font_size, spacing);
 
         if(pos.x + size.x > end_bound) {
             pos.x = start_bound;
             pos.y += size.y;
         }
 
-        DrawTextEx(font, word, pos, mdText.font_size, spacing, color);
+        DrawTextEx(font, word, pos, node->font_size, spacing, node->color);
         pos.x += size.x + space_size;
     }
 
@@ -232,7 +246,7 @@ int main(void)
     const char *file_path = "./examples/partial-example.md";
 
     assert(lexer_init(file_path));
-    MDTexts texts = get_md_texts();
+    MDList list = get_parsed_markdown();
     lexer_destroy();
 
     InitWindow(1280, 720, "Markdown RayDer");
@@ -240,7 +254,6 @@ int main(void)
     load_fonts();
 
     Vector2 camera = {0};
-    camera.x = 20;
 
     while(!WindowShouldClose()) {
         int screen_width = GetScreenWidth();
@@ -267,21 +280,31 @@ int main(void)
         ClearBackground(MD_BLACK);
 
         int cur_line = 0;
+        int line_height = 10;
 
-        int margin_top = 10;
+        Vector2 draw_pos = {0};
 
-        Vector2 pos = camera;
+        int prev_height = -1;
+        MDNode *node = list.head;
 
-        for(size_t i = 0; i < texts.count; i++) {
-            MDText mdText = texts.items[i];
+        while(node != NULL) {
+            switch(node->type) {
+                case TEXT_NODE: {
+                    TextNode *text_node = (TextNode*)node->data;
 
-            if(cur_line < mdText.line && i > 0) {
-                pos.x = 20;
-                pos.y += texts.items[i - 1].font_size + margin_top;
-                cur_line = mdText.line;
+                    if(cur_line != text_node->line && prev_height > 0) {
+                        pos.x = 0;
+                        pos.y += prev_height + line_height;
+                        cur_line = text_node->line;
+                    }
+
+                    pos = draw_text_node(pos, 20, screen_width - 20, text_node);
+                    prev_height = text_node->font_size;
+                } break;
+                default: continue;
             }
 
-            pos = draw_text(pos, 20, screen_width - 20, mdText);
+            node = node->next;
         }
 
 
@@ -292,7 +315,7 @@ int main(void)
 
     CloseWindow();
 
-    free_md_texts(texts);
+    free_md_list(list);
 
     return 0;
 }
