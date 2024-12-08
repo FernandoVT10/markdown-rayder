@@ -95,17 +95,17 @@ void insert_end_list_item(MDList *list, enum MDNodeType type, void *data)
 int get_header_font_size(enum TokenType type)
 {
     switch(type) {
-        case HEADER_1:
+        case TKN_HEADER_1:
             return HEADER_1_FONT_SIZE;
-        case HEADER_2:
+        case TKN_HEADER_2:
             return HEADER_2_FONT_SIZE;
-        case HEADER_3:
+        case TKN_HEADER_3:
             return HEADER_3_FONT_SIZE;
-        case HEADER_4:
+        case TKN_HEADER_4:
             return HEADER_4_FONT_SIZE;
-        case HEADER_5:
+        case TKN_HEADER_5:
             return HEADER_5_FONT_SIZE;
-        case HEADER_6:
+        case TKN_HEADER_6:
             return HEADER_6_FONT_SIZE;
         default:
             return DEFAULT_FONT_SIZE;
@@ -123,17 +123,17 @@ MDList get_parsed_markdown()
     bool italic = false;
     Color color = MD_WHITE;
 
-    while(token->type != END_OF_FILE) {
+    while(token->type != TKN_EOF) {
         switch(token->type) {
-            case HEADER_1:
-            case HEADER_2:
-            case HEADER_3:
-            case HEADER_4:
-            case HEADER_5:
-            case HEADER_6: {
+            case TKN_HEADER_1:
+            case TKN_HEADER_2:
+            case TKN_HEADER_3:
+            case TKN_HEADER_4:
+            case TKN_HEADER_5:
+            case TKN_HEADER_6: {
                 font_size = get_header_font_size(token->type);
             } break;
-            case TEXT: {
+            case TKN_TEXT: {
                 TextNode *text = malloc(sizeof(TextNode));
                 *text = (TextNode) {
                     .font_size = font_size,
@@ -144,8 +144,8 @@ MDList get_parsed_markdown()
                 };
                 insert_end_list_item(&list, TEXT_NODE, text);
             } break;
-            case NEWLINE: {
-                if(lexer_is_prev_token(NEWLINE)) break;
+            case TKN_NEWLINE: {
+                if(lexer_is_prev_token(TKN_NEWLINE)) break;
 
                 NewLineNode *node = malloc(sizeof(NewLineNode));
                 node->line_height = font_size;
@@ -156,14 +156,14 @@ MDList get_parsed_markdown()
                 bold = false;
                 color = MD_WHITE;
             } break;
-            case ITALIC: {
+            case TKN_ITALIC: {
                 italic = !italic;
             } break;
-            case BOLD: {
+            case TKN_BOLD: {
                 bold = !bold;
                 color = MD_BLUE;
             } break;
-            case CODE: {
+            case TKN_CODE: {
                 TextNode *text = malloc(sizeof(TextNode));
                 *text = (TextNode) {
                     .font_size = font_size,
@@ -174,12 +174,12 @@ MDList get_parsed_markdown()
                 };
                 insert_end_list_item(&list, TEXT_NODE, text);
             } break;
-            case LIST_ITEM: {
+            case TKN_LIST_INDICATOR: {
                 ListIndicatorNode *node = malloc(sizeof(ListIndicatorNode));
                 node->color = MD_BLUE;
                 insert_end_list_item(&list, LIST_INDICATOR_NODE, node);
             } break;
-            case END_OF_FILE: UNREACHABLE("END_OF_FILE reached");
+            case TKN_EOF: UNREACHABLE("END_OF_FILE reached");
         }
 
         token = lexer_next_token();

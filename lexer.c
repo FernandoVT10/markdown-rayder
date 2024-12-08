@@ -71,17 +71,17 @@ enum TokenType get_header_type(int level)
 {
     switch(level) {
         case 1:
-            return HEADER_1;
+            return TKN_HEADER_1;
         case 2:
-            return HEADER_2;
+            return TKN_HEADER_2;
         case 3:
-            return HEADER_3;
+            return TKN_HEADER_3;
         case 4:
-            return HEADER_4;
+            return TKN_HEADER_4;
         case 5:
-            return HEADER_5;
+            return TKN_HEADER_5;
         case 6:
-            return HEADER_6;
+            return TKN_HEADER_6;
         default:
             UNREACHABLE("tried to get a header level greater than 6");
     }
@@ -122,12 +122,11 @@ void lexer_process_next_token()
     char c = lexer_get_and_advance();
 
     // ignore starting spaces
-    if(c == ' ' && lexer_is_prev_token(NEWLINE)) {
-        int spaces_count = 1;
-        while((c = lexer_get_and_advance()) == ' ') count++;
+    if(c == ' ' && lexer_is_prev_token(TKN_NEWLINE)) {
+        while((c = lexer_get_and_advance()) == ' ');
     }
 
-    if(c == '#' && (lexer_is_prev_token(NEWLINE) || lexer_is_first_token())) {
+    if(c == '#' && (lexer_is_prev_token(TKN_NEWLINE) || lexer_is_first_token())) {
         int level = 1;
 
         while(lexer_peek_n_char(level - 1) == '#') level++;
@@ -140,20 +139,20 @@ void lexer_process_next_token()
     }
 
     if(c == '\n') {
-        lexer_set_only_token_type(NEWLINE);
+        lexer_set_only_token_type(TKN_NEWLINE);
         return;
     }
 
     if(c == EOF) {
-        lexer_set_only_token_type(END_OF_FILE);
+        lexer_set_only_token_type(TKN_EOF);
         return;
     }
 
     // It's important for this to be before of the bold & italic check
-    if(c == '*' && (lexer_is_prev_token(NEWLINE) || lexer_is_first_token())) {
+    if(c == '*' && (lexer_is_prev_token(TKN_NEWLINE) || lexer_is_first_token())) {
         if(lexer_peek_n_char(0) == ' ') {
             lexer_advance(1);
-            lexer_set_only_token_type(LIST_ITEM);
+            lexer_set_only_token_type(TKN_LIST_INDICATOR);
             return;
         }
     }
@@ -162,16 +161,16 @@ void lexer_process_next_token()
         if((c == '*' && lexer_peek_n_char(0) == '*') || (c == '_' && lexer_peek_n_char(0) == '_')) {
             lexer_advance();
 
-            lexer_set_only_token_type(BOLD);
+            lexer_set_only_token_type(TKN_BOLD);
             return;
         }
 
-        lexer_set_only_token_type(ITALIC);
+        lexer_set_only_token_type(TKN_ITALIC);
         return;
     }
 
     if(c == '`') {
-        lexer.token.type = CODE;
+        lexer.token.type = TKN_CODE;
 
         int start_pos = lexer.cursor;
 
@@ -200,7 +199,7 @@ void lexer_process_next_token()
     // we rewind the special character encountered
     lexer_rewind(1);
 
-    lexer.token.type = TEXT;
+    lexer.token.type = TKN_TEXT;
     copy_buf_to_string(&lexer.token.lexeme, lexer.buf + start_pos, lexer.cursor - start_pos);
 }
 

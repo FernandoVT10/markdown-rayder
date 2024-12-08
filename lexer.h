@@ -33,19 +33,19 @@ typedef struct String {
 } String;
 
 enum TokenType {
-    HEADER_1,
-    HEADER_2,
-    HEADER_3,
-    HEADER_4,
-    HEADER_5,
-    HEADER_6,
-    NEWLINE,
-    TEXT,
-    END_OF_FILE,
-    ITALIC,
-    BOLD,
-    CODE,
-    LIST_ITEM,
+    TKN_HEADER_1,
+    TKN_HEADER_2,
+    TKN_HEADER_3,
+    TKN_HEADER_4,
+    TKN_HEADER_5,
+    TKN_HEADER_6,
+    TKN_NEWLINE,
+    TKN_TEXT,
+    TKN_EOF,
+    TKN_ITALIC,
+    TKN_BOLD,
+    TKN_CODE,
+    TKN_LIST_INDICATOR,
 };
 
 typedef struct Token {
