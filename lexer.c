@@ -89,7 +89,7 @@ enum TokenType get_header_type(int level)
 
 bool is_special_char(char c)
 {
-    return c == '#' || c == '\n' || c == EOF || c == '*' || c == '`';
+    return c == '#' || c == '\n' || c == EOF || c == '*' || c == '`' || c == '_';
 }
 
 void copy_buf_to_string(String *str, char *buf, size_t buf_size)
@@ -121,6 +121,12 @@ void lexer_process_next_token()
 {
     char c = lexer_get_and_advance();
 
+    // ignore starting spaces
+    if(c == ' ' && lexer_is_prev_token(NEWLINE)) {
+        int spaces_count = 1;
+        while((c = lexer_get_and_advance()) == ' ') count++;
+    }
+
     if(c == '#' && (lexer_is_prev_token(NEWLINE) || lexer_is_first_token())) {
         int level = 1;
 
@@ -143,8 +149,17 @@ void lexer_process_next_token()
         return;
     }
 
-    if(c == '*') {
-        if(lexer_peek_n_char(0) == '*') {
+    // It's important for this to be before of the bold & italic check
+    if(c == '*' && (lexer_is_prev_token(NEWLINE) || lexer_is_first_token())) {
+        if(lexer_peek_n_char(0) == ' ') {
+            lexer_advance(1);
+            lexer_set_only_token_type(LIST_ITEM);
+            return;
+        }
+    }
+
+    if(c == '*' || c == '_') {
+        if((c == '*' && lexer_peek_n_char(0) == '*') || (c == '_' && lexer_peek_n_char(0) == '_')) {
             lexer_advance();
 
             lexer_set_only_token_type(BOLD);
@@ -182,6 +197,7 @@ void lexer_process_next_token()
         c = lexer_get_and_advance();
     }
 
+    // we rewind the special character encountered
     lexer_rewind(1);
 
     lexer.token.type = TEXT;
