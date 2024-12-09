@@ -87,6 +87,7 @@ enum TokenType get_header_type(int level)
     }
 }
 
+// returns true for any char that belong to a token
 bool is_special_char(char c)
 {
     return c == '#' || c == '\n' || c == EOF || c == '*' || c == '`' || c == '_';
@@ -117,16 +118,36 @@ bool lexer_is_prev_token(enum TokenType type)
     return lexer.prev_token.type == type;
 }
 
+bool lexer_is_prev_token_whitespace()
+{
+    return lexer_is_prev_token(TKN_NEWLINE)
+            || lexer_is_first_token()
+            || lexer_is_prev_token(TKN_TAB);
+}
+
 void lexer_process_next_token()
 {
     char c = lexer_get_and_advance();
 
-    // ignore starting spaces
-    if(c == ' ' && lexer_is_prev_token(TKN_NEWLINE)) {
-        while((c = lexer_get_and_advance()) == ' ');
+    // TABS
+    if(c == ' ' && lexer_is_prev_token_whitespace()) {
+        int spaces_count = 1;
+        while(lexer_peek_n_char(0) == ' ' && spaces_count < 4) {
+            spaces_count++;
+            c = lexer_get_and_advance();
+        }
+
+        if(spaces_count > 1) {
+            lexer_set_only_token_type(TKN_TAB);
+            return;
+        }
+
+        // if there's only 1 space, we ignore it, and continue lexing the next char
+        c = lexer_get_and_advance();
     }
 
-    if(c == '#' && (lexer_is_prev_token(TKN_NEWLINE) || lexer_is_first_token())) {
+    // HEADERS
+    if(c == '#' && lexer_is_prev_token_whitespace()) {
         int level = 1;
 
         while(lexer_peek_n_char(level - 1) == '#') level++;
@@ -138,18 +159,21 @@ void lexer_process_next_token()
         }
     }
 
+    // NEWLINE
     if(c == '\n') {
         lexer_set_only_token_type(TKN_NEWLINE);
         return;
     }
 
+    // END OF FILE
     if(c == EOF) {
         lexer_set_only_token_type(TKN_EOF);
         return;
     }
 
-    // It's important for this to be before of the bold & italic check
-    if(c == '*' && (lexer_is_prev_token(TKN_NEWLINE) || lexer_is_first_token())) {
+    // LISTS
+    // NOTE: It's important for this to be before of the bold & italic check
+    if(c == '*' && lexer_is_prev_token_whitespace()) {
         if(lexer_peek_n_char(0) == ' ') {
             lexer_advance(1);
             lexer_set_only_token_type(TKN_LIST_INDICATOR);
@@ -157,6 +181,7 @@ void lexer_process_next_token()
         }
     }
 
+    // BOLD AND ITALIC
     if(c == '*' || c == '_') {
         if((c == '*' && lexer_peek_n_char(0) == '*') || (c == '_' && lexer_peek_n_char(0) == '_')) {
             lexer_advance();
@@ -169,6 +194,7 @@ void lexer_process_next_token()
         return;
     }
 
+    // INLINE CODE
     if(c == '`') {
         lexer.token.type = TKN_CODE;
 
@@ -189,6 +215,7 @@ void lexer_process_next_token()
         return;
     }
 
+    // TEXT
     int start_pos = lexer.cursor - 1;
 
     c = lexer_get_and_advance();

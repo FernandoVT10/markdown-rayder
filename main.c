@@ -23,6 +23,8 @@
 #define LIST_IND_MARGIN_RIGHT 5 // the margin after the list indicator and before the text
 #define LIST_DOT_RADIUS 3
 
+#define TAB_SIZE 20
+
 typedef struct TextNode {
     int font_size;
     char *text;
@@ -50,6 +52,7 @@ enum MDNodeType {
     TEXT_NODE,
     LIST_INDICATOR_NODE,
     NEWLINE_NODE,
+    TAB_NODE,
 };
 
 typedef struct MDNode MDNode;
@@ -178,6 +181,10 @@ MDList get_parsed_markdown()
                 ListIndicatorNode *node = malloc(sizeof(ListIndicatorNode));
                 node->color = MD_BLUE;
                 insert_end_list_item(&list, LIST_INDICATOR_NODE, node);
+            } break;
+            case TKN_TAB: {
+                // Is this a good idea?
+                insert_end_list_item(&list, TAB_NODE, NULL);
             } break;
             case TKN_EOF: UNREACHABLE("END_OF_FILE reached");
         }
@@ -318,6 +325,9 @@ int main(void)
                     DrawCircle(draw_pos.x, pos_y, radius, l_node->color);
 
                     draw_pos.x += radius * 2 + LIST_IND_MARGIN_RIGHT;
+                } break;
+                case TAB_NODE: {
+                    draw_pos.x += TAB_SIZE;
                 } break;
                 default: break;
             }

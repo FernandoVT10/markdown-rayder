@@ -46,6 +46,7 @@ enum TokenType {
     TKN_BOLD,
     TKN_CODE,
     TKN_LIST_INDICATOR,
+    TKN_TAB,
 };
 
 typedef struct Token {
