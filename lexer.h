@@ -45,7 +45,8 @@ enum TokenType {
     TKN_ITALIC,
     TKN_BOLD,
     TKN_CODE,
-    TKN_LIST_INDICATOR,
+    TKN_ULIST_INDICATOR, // unordered list
+    TKN_OLIST_INDICATOR, // ordered list
     TKN_TAB,
 };
 

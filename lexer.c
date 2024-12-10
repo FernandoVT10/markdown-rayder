@@ -1,3 +1,4 @@
+#include <ctype.h>
 #include "lexer.h"
 
 Lexer lexer = {0};
@@ -58,6 +59,11 @@ char lexer_peek_n_char(int n)
 void lexer_advance()
 {
     lexer.cursor++;
+}
+
+void lexer_advance_n(int n)
+{
+    lexer.cursor += n;
 }
 
 void lexer_rewind(int n) {
@@ -171,12 +177,28 @@ void lexer_process_next_token()
         return;
     }
 
-    // LISTS
+    // UNORDERED LISTS
     // NOTE: It's important for this to be before of the bold & italic check
     if(c == '*' && lexer_is_prev_token_whitespace()) {
         if(lexer_peek_n_char(0) == ' ') {
             lexer_advance(1);
-            lexer_set_only_token_type(TKN_LIST_INDICATOR);
+            lexer_set_only_token_type(TKN_ULIST_INDICATOR);
+            return;
+        }
+    }
+
+    // ORDERED LISTS
+    if(isdigit(c) && lexer_is_prev_token_whitespace()) {
+        int start_pos = lexer.cursor - 1;
+        int digit_count = 1;
+
+        while(isdigit(lexer_peek_n_char(digit_count - 1))) digit_count++;
+
+        if(lexer_peek_n_char(digit_count - 1) == '.' && lexer_peek_n_char(digit_count) == ' ') {
+            lexer_advance_n(digit_count + 1);
+
+            lexer.token.type = TKN_OLIST_INDICATOR;
+            copy_buf_to_string(&lexer.token.lexeme, lexer.buf + start_pos, lexer.cursor - start_pos);
             return;
         }
     }
