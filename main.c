@@ -151,6 +151,7 @@ MDList get_parsed_markdown()
                 insert_end_list_item(&list, TEXT_NODE, text);
             } break;
             case TKN_NEWLINE: {
+                // consecutive new lines should be ignored
                 if(lexer_is_prev_token(TKN_NEWLINE)) break;
 
                 NewLineNode *node = malloc(sizeof(NewLineNode));
@@ -167,7 +168,6 @@ MDList get_parsed_markdown()
             } break;
             case TKN_BOLD: {
                 bold = !bold;
-
                 color = bold ? MD_BLUE : MD_WHITE;
             } break;
             case TKN_CODE: {
@@ -190,7 +190,6 @@ MDList get_parsed_markdown()
                 insert_end_list_item(&list, OLIST_INDICATOR_NODE, node);
             } break;
             case TKN_TAB: {
-                // Is this a good idea?
                 insert_end_list_item(&list, TAB_NODE, NULL);
             } break;
             case TKN_EOF: UNREACHABLE("END_OF_FILE reached");
@@ -268,6 +267,32 @@ Vector2 draw_text_node(Vector2 pos, int start_bound, int end_bound, TextNode *no
     return pos;
 }
 
+void draw_list_dot(Vector2 *pos)
+{
+    int radius = LIST_DOT_RADIUS;
+    pos->x += LIST_MARGIN_LEFT;
+
+    // NOTE: to center the dot we assume that the font size of the text is the default one
+    int center_y = pos->y + DEFAULT_FONT_SIZE / 2;
+
+    DrawCircle(pos->x, center_y, radius, LIST_DOT_COLOR);
+
+    pos->x += radius * 2 + LIST_IND_MARGIN_RIGHT;
+}
+
+void draw_list_indicator(Vector2 *pos, OListIndicatorNode *node)
+{
+    pos->x += LIST_MARGIN_LEFT;
+
+    int spacing = 2;
+    Font font = state.fonts.bold;
+
+    DrawTextEx(font, node->indicator, *pos, DEFAULT_FONT_SIZE, spacing, LIST_NUM_COLOR);
+
+    Vector2 size = MeasureTextEx(font, node->indicator, DEFAULT_FONT_SIZE, spacing);
+    pos->x += size.x;
+}
+
 int main(void)
 {
     const char *file_path = "./examples/partial-example.md";
@@ -313,7 +338,6 @@ int main(void)
             switch(node->type) {
                 case TEXT_NODE: {
                     TextNode *text_node = (TextNode*)node->data;
-
                     draw_pos = draw_text_node(draw_pos, 20, screen_width - 20, text_node);
                 } break;
                 case NEWLINE_NODE: {
@@ -322,27 +346,10 @@ int main(void)
                     draw_pos.x = 0;
                 } break;
                 case ULIST_INDICATOR_NODE: {
-                    int radius = LIST_DOT_RADIUS;
-                    draw_pos.x += LIST_MARGIN_LEFT;
-
-                    // NOTE: to center the dot we assume that the font size of the text is the default one
-                    int pos_y = draw_pos.y + DEFAULT_FONT_SIZE / 2;
-
-                    DrawCircle(draw_pos.x, pos_y, radius, LIST_DOT_COLOR);
-
-                    draw_pos.x += radius * 2 + LIST_IND_MARGIN_RIGHT;
+                    draw_list_dot(&draw_pos);
                 } break;
                 case OLIST_INDICATOR_NODE: {
-                    OListIndicatorNode *l_node = (OListIndicatorNode*)node->data;
-                    draw_pos.x += LIST_MARGIN_LEFT;
-
-                    int spacing = 2;
-                    Font font = state.fonts.bold;
-
-                    DrawTextEx(font, l_node->indicator, draw_pos, DEFAULT_FONT_SIZE, spacing, LIST_NUM_COLOR);
-                    Vector2 size = MeasureTextEx(font, l_node->indicator, DEFAULT_FONT_SIZE, spacing);
-
-                    draw_pos.x += size.x;
+                    draw_list_indicator(&draw_pos, (OListIndicatorNode*)node->data);
                 } break;
                 case TAB_NODE: {
                     draw_pos.x += TAB_SIZE;

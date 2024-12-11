@@ -39,6 +39,8 @@ bool lexer_init(const char *file_path)
 
 char lexer_get_char(int pos)
 {
+    if(pos < 0) pos = 0;
+
     if(pos >= strlen(lexer.buf)) {
         return EOF;
     }
@@ -54,6 +56,10 @@ char lexer_get_and_advance()
 char lexer_peek_n_char(int n)
 {
     return lexer_get_char(lexer.cursor + n);
+}
+
+bool lexer_is_next_char(char c) {
+    return lexer_peek_n_char(0) == c;
 }
 
 void lexer_advance()
@@ -76,27 +82,21 @@ void lexer_rewind(int n) {
 enum TokenType get_header_type(int level)
 {
     switch(level) {
-        case 1:
-            return TKN_HEADER_1;
-        case 2:
-            return TKN_HEADER_2;
-        case 3:
-            return TKN_HEADER_3;
-        case 4:
-            return TKN_HEADER_4;
-        case 5:
-            return TKN_HEADER_5;
-        case 6:
-            return TKN_HEADER_6;
+        case 1: return TKN_HEADER_1;
+        case 2: return TKN_HEADER_2;
+        case 3: return TKN_HEADER_3;
+        case 4: return TKN_HEADER_4;
+        case 5: return TKN_HEADER_5;
+        case 6: return TKN_HEADER_6;
         default:
             UNREACHABLE("tried to get a header level greater than 6");
     }
 }
 
-// returns true for any char that belong to a token
+// returns true for any char that belong to an inline token
 bool is_special_char(char c)
 {
-    return c == '#' || c == '\n' || c == EOF || c == '*' || c == '`' || c == '_';
+    return c == '\n' || c == EOF || c == '*' || c == '`' || c == '_';
 }
 
 void copy_buf_to_string(String *str, char *buf, size_t buf_size)
@@ -138,7 +138,8 @@ void lexer_process_next_token()
     // TABS
     if(c == ' ' && lexer_is_prev_token_whitespace()) {
         int spaces_count = 1;
-        while(lexer_peek_n_char(0) == ' ' && spaces_count < 4) {
+
+        while(lexer_is_next_char(' ') && spaces_count < 4) {
             spaces_count++;
             c = lexer_get_and_advance();
         }
@@ -180,7 +181,7 @@ void lexer_process_next_token()
     // UNORDERED LISTS
     // NOTE: It's important for this to be before of the bold & italic check
     if(c == '*' && lexer_is_prev_token_whitespace()) {
-        if(lexer_peek_n_char(0) == ' ') {
+        if(lexer_is_next_char(' ')) {
             lexer_advance(1);
             lexer_set_only_token_type(TKN_ULIST_INDICATOR);
             return;
@@ -205,7 +206,7 @@ void lexer_process_next_token()
 
     // BOLD AND ITALIC
     if(c == '*' || c == '_') {
-        if((c == '*' && lexer_peek_n_char(0) == '*') || (c == '_' && lexer_peek_n_char(0) == '_')) {
+        if((c == '*' && lexer_is_next_char('*')) || (c == '_' && lexer_is_next_char('_'))) {
             lexer_advance();
 
             lexer_set_only_token_type(TKN_BOLD);
