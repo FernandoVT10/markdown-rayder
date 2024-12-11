@@ -167,7 +167,8 @@ MDList get_parsed_markdown()
             } break;
             case TKN_BOLD: {
                 bold = !bold;
-                color = MD_BLUE;
+
+                color = bold ? MD_BLUE : MD_WHITE;
             } break;
             case TKN_CODE: {
                 TextNode *text = malloc(sizeof(TextNode));
