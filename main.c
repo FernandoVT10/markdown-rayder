@@ -87,7 +87,13 @@ State state = {0};
 
 void insert_end_list_item(MDList *list, enum MDNodeType type, void *data)
 {
-    MDNode *node = malloc(sizeof(MDNode));
+    MDNode *node = calloc(sizeof(MDNode), 1);
+
+    if(node == NULL) {
+        TraceLog(LOG_ERROR, "Trying to allocate memory for a MDNode");
+        return;
+    }
+
     node->type = type;
     node->data = data;
     node->next = NULL;
@@ -147,7 +153,13 @@ MDList get_parsed_markdown()
                 font_size = get_header_font_size(token->type);
             } break;
             case TKN_TEXT: {
-                TextNode *text = malloc(sizeof(TextNode));
+                TextNode *text = calloc(sizeof(TextNode), 1);
+
+                if(text == NULL) {
+                    TraceLog(LOG_ERROR, "Trying to allocate memory for a TextNode");
+                    break;
+                }
+
                 *text = (TextNode) {
                     .font_size = font_size,
                     .text = strdup(token->lexeme.items),
@@ -161,7 +173,13 @@ MDList get_parsed_markdown()
                 // consecutive new lines should be ignored
                 if(lexer_is_prev_token(TKN_NEWLINE)) break;
 
-                NewLineNode *node = malloc(sizeof(NewLineNode));
+                NewLineNode *node = calloc(sizeof(NewLineNode), 1);
+
+                if(node == NULL) {
+                    TraceLog(LOG_ERROR, "Trying to allocate memory for a NewLineNode");
+                    break;
+                }
+
                 node->line_height = font_size;
                 insert_end_list_item(&list, NEWLINE_NODE, node);
 
@@ -178,7 +196,13 @@ MDList get_parsed_markdown()
                 color = bold ? MD_BLUE : MD_WHITE;
             } break;
             case TKN_CODE: {
-                TextNode *text = malloc(sizeof(TextNode));
+                TextNode *text = calloc(sizeof(TextNode), 1);
+
+                if(text == NULL) {
+                    TraceLog(LOG_ERROR, "Trying to allocate memory for a TextNode");
+                    break;
+                }
+
                 *text = (TextNode) {
                     .font_size = font_size,
                     .text = strdup(token->lexeme.items),
@@ -192,7 +216,13 @@ MDList get_parsed_markdown()
                 insert_end_list_item(&list, ULIST_INDICATOR_NODE, NULL);
             } break;
             case TKN_OLIST_INDICATOR: {
-                OListIndicatorNode *node = malloc(sizeof(OListIndicatorNode));
+                OListIndicatorNode *node = calloc(sizeof(OListIndicatorNode), 1);
+
+                if(node == NULL) {
+                    TraceLog(LOG_ERROR, "Trying to allocate memory for a OListIndicatorNode");
+                    break;
+                }
+
                 node->indicator = strdup(token->lexeme.items);
                 insert_end_list_item(&list, OLIST_INDICATOR_NODE, node);
             } break;
@@ -347,11 +377,17 @@ void draw_list_indicator(Vector2 *pos, OListIndicatorNode *node)
 void open_link(char *dest)
 {
     const char *cmd = "open ";
-    char *full_cmd = malloc(strlen(cmd) + strlen(dest) + 1);
+    char *full_cmd = calloc(strlen(cmd) + strlen(dest) + 1, 1);
+
+    if(full_cmd == NULL) {
+        TraceLog(LOG_ERROR, "Couldn't allocate memory because of for the cmd command");
+        return;
+    }
 
     strcpy(full_cmd, cmd);
     strcat(full_cmd, dest);
 
+    // TODO: log error when this fails
     system(full_cmd);
 }
 

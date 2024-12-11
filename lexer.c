@@ -16,6 +16,12 @@ char *load_file_contents(const char *path)
     rewind(file);
 
     char *text = calloc(sizeof(char), file_size + 1);
+
+    if(text == NULL) {
+        TraceLog(LOG_ERROR, "Couldn't allocate memory to contain the file");
+        return NULL;
+    }
+
     fread(text, file_size, sizeof(char), file);
     text[file_size] = '\0';
 
