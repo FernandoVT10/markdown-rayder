@@ -50,6 +50,8 @@ enum TokenType {
     TKN_TAB,
     TKN_LINK_TEXT,
     TKN_LINK_DEST,
+    TKN_IMAGE_ALT,
+    TKN_IMAGE_URL,
 };
 
 typedef struct Token {

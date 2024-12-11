@@ -284,6 +284,49 @@ void lexer_process_next_token()
         }
     }
 
+    // IMAGES
+    // IMAGE ALT TEXT
+    if(c == '!' && lexer_is_next_char('[')) {
+        // skip the '[' char
+        lexer_advance();
+
+        int char_count = 0;
+        int start_pos = lexer.cursor;
+
+        char next_char = lexer_peek_n_char(char_count);
+        while(next_char != ']' && next_char != '\n') {
+            char_count++;
+            next_char = lexer_peek_n_char(char_count);
+        }
+
+        if(next_char == ']') {
+            lexer_advance_n(char_count + 1);
+            lexer.token.type = TKN_IMAGE_ALT;
+            int copy_size = lexer.cursor - start_pos - 1;
+            copy_buf_to_string(&lexer.token.lexeme, lexer.buf + start_pos, copy_size);
+            return;
+        }
+    }
+    // IMAGE URL
+    if(c == '(' && lexer_is_prev_token(TKN_IMAGE_ALT)) {
+        int char_count = 0;
+        int start_pos = lexer.cursor;
+
+        char next_char = lexer_peek_n_char(char_count);
+        while(next_char != ')' && next_char != '\n') {
+            char_count++;
+            next_char = lexer_peek_n_char(char_count);
+        }
+
+        if(next_char == ')') {
+            lexer_advance_n(char_count + 1);
+            lexer.token.type = TKN_IMAGE_URL;
+            int copy_size = lexer.cursor - start_pos - 1;
+            copy_buf_to_string(&lexer.token.lexeme, lexer.buf + start_pos, copy_size);
+            return;
+        }
+    }
+
     // TEXT
     int start_pos = lexer.cursor - 1;
 

@@ -1,6 +1,7 @@
 #include "raylib.h"
 #include "raymath.h"
 #include "lexer.h"
+#include <curl/curl.h>
 
 #define MD_BLACK CLITERAL(Color){9, 9, 17, 255}
 #define MD_WHITE CLITERAL(Color){221, 221, 244, 255}
@@ -27,6 +28,16 @@
 
 #define TAB_SIZE 20
 
+enum MDNodeType {
+    TEXT_NODE,
+    ULIST_INDICATOR_NODE,
+    OLIST_INDICATOR_NODE,
+    NEWLINE_NODE,
+    TAB_NODE,
+    LINK_NODE,
+    IMAGE_NODE,
+};
+
 typedef struct TextNode {
     int font_size;
     char *text;
@@ -49,21 +60,10 @@ typedef struct LinkNode {
     bool hover;
 } LinkNode;
 
-typedef struct Fonts {
-    Font regular;
-    Font bold;
-    Font italic;
-    Font bold_italic;
-} Fonts;
-
-enum MDNodeType {
-    TEXT_NODE,
-    ULIST_INDICATOR_NODE,
-    OLIST_INDICATOR_NODE,
-    NEWLINE_NODE,
-    TAB_NODE,
-    LINK_NODE,
-};
+typedef struct ImageNode {
+    Texture2D image_texture;
+    char *alt;
+} ImageNode;
 
 typedef struct MDNode MDNode;
 
@@ -78,6 +78,13 @@ typedef struct MDList {
     MDNode *tail;
     size_t count;
 } MDList;
+
+typedef struct Fonts {
+    Font regular;
+    Font bold;
+    Font italic;
+    Font bold_italic;
+} Fonts;
 
 typedef struct State {
     Fonts fonts;
@@ -129,6 +136,83 @@ int get_header_font_size(enum TokenType type)
         default:
             return DEFAULT_FONT_SIZE;
     }
+}
+
+struct MemoryStruct {
+  char *memory;
+  size_t size;
+};
+
+static size_t write_memory_callback(void *contents, size_t size, size_t nmemb, void *chunk)
+{
+    size_t realsize = size * nmemb;
+    struct MemoryStruct *mem = (struct MemoryStruct *)chunk;
+
+    char *ptr = realloc(mem->memory, mem->size + realsize + 1);
+    if(!ptr) {
+        /* out of memory! */
+        printf("not enough memory (realloc returned NULL)\n");
+        return 0;
+    }
+
+    mem->memory = ptr;
+    memcpy(&(mem->memory[mem->size]), contents, realsize);
+    mem->size += realsize;
+    mem->memory[mem->size] = 0;
+
+    return realsize;
+}
+
+Texture2D load_texture_from_url(const char *image_url)
+{
+    CURL *curl_handle;
+    CURLcode res;
+
+    struct MemoryStruct chunk;
+
+    chunk.memory = malloc(1);  /* grown as needed by the realloc above */
+    chunk.size = 0;    /* no data at this point */
+
+    curl_global_init(CURL_GLOBAL_ALL);
+
+    /* init the curl session */
+    curl_handle = curl_easy_init();
+
+    /* specify URL to get */
+    curl_easy_setopt(curl_handle, CURLOPT_URL, image_url);
+
+    /* send all data to this function  */
+    curl_easy_setopt(curl_handle, CURLOPT_WRITEFUNCTION, write_memory_callback);
+
+    /* we pass our 'chunk' struct to the callback function */
+    curl_easy_setopt(curl_handle, CURLOPT_WRITEDATA, (void *)&chunk);
+
+    /* some servers do not like requests that are made without a user-agent
+     field, so we provide one */
+    curl_easy_setopt(curl_handle, CURLOPT_USERAGENT, "libcurl-agent/1.0");
+
+    /* get it! */
+    res = curl_easy_perform(curl_handle);
+
+    /* check for errors */
+    if(res != CURLE_OK) {
+        fprintf(stderr, "curl_easy_perform() failed: %s\n",
+                curl_easy_strerror(res));
+    }
+
+    Image image = LoadImageFromMemory(".jpg", (unsigned char *)chunk.memory, chunk.size);
+    Texture2D texture = LoadTextureFromImage(image);
+    UnloadImage(image);
+
+    /* cleanup curl stuff */
+    curl_easy_cleanup(curl_handle);
+
+    free(chunk.memory);
+
+    /* we are done with libcurl, so clean it up */
+    curl_global_cleanup();
+
+    return texture;
 }
 
 MDList get_parsed_markdown()
@@ -243,6 +327,20 @@ MDList get_parsed_markdown()
                 LinkNode *l_node = (LinkNode*)node->data;
                 l_node->dest = strdup(token->lexeme.items);
             } break;
+            case TKN_IMAGE_ALT: {
+                ImageNode *node = calloc(sizeof(ImageNode), 1);
+                node->alt = strdup(token->lexeme.items);
+                insert_end_list_item(&list, IMAGE_NODE, node);
+            } break;
+            case TKN_IMAGE_URL: {
+                MDNode *node = list.tail;
+                // TKN_IMAGE_ALT should always appear before this token
+                // and therefore should create the necessary node
+                assert(node->type == IMAGE_NODE);
+                ImageNode *i_node = (ImageNode*)node->data;
+
+                i_node->image_texture = load_texture_from_url(token->lexeme.items);
+            } break;
             case TKN_EOF: UNREACHABLE("END_OF_FILE reached");
         }
 
@@ -271,6 +369,11 @@ void free_md_list(MDList list)
                 LinkNode *l_node = (LinkNode*)node->data;
                 free(l_node->text);
                 free(l_node->dest);
+            } break;
+            case IMAGE_NODE: {
+                ImageNode *i_node = (ImageNode*)node->data;
+                free(i_node->alt);
+                UnloadTexture(i_node->image_texture);
             } break;
             case NEWLINE_NODE:
             case TAB_NODE:
@@ -418,8 +521,7 @@ void handle_link(Vector2 *pos, LinkNode *node)
         }
     }
 
-
-    if(node->hover && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+    if(node->hover && IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && node->dest) {
         open_link(node->dest);
     }
 
@@ -445,13 +547,13 @@ void handle_link(Vector2 *pos, LinkNode *node)
 
 int main(void)
 {
+    InitWindow(1280, 720, "Markdown RayDer");
+    SetTargetFPS(60);
     const char *file_path = "./examples/partial-example.md";
 
     assert(lexer_init(file_path));
     MDList list = get_parsed_markdown();
     lexer_destroy();
-
-    InitWindow(1280, 720, "Markdown RayDer");
 
     load_fonts();
 
@@ -474,6 +576,12 @@ int main(void)
         }
 
         if(IsKeyPressed(KEY_F)) {
+            if(IsWindowFullscreen()) {
+                SetWindowSize(1280, 720);
+            } else {
+                int monitor = GetCurrentMonitor();
+                SetWindowSize(GetMonitorWidth(monitor), GetMonitorHeight(monitor));
+            }
             ToggleFullscreen();
         }
 
@@ -507,6 +615,12 @@ int main(void)
                 case LINK_NODE: {
                     handle_link(&draw_pos, (LinkNode*)node->data);
                 } break;
+                case IMAGE_NODE: {
+                    ImageNode *i_node = (ImageNode*)node->data;
+                    DrawTexture(i_node->image_texture, draw_pos.x, draw_pos.y, WHITE);
+                    draw_pos.x = 0;
+                    draw_pos.y += i_node->image_texture.height;
+                } break;
             }
 
             node = node->next;
@@ -516,10 +630,9 @@ int main(void)
     }
 
     unload_fonts();
+    free_md_list(list);
 
     CloseWindow();
-
-    free_md_list(list);
 
     return 0;
 }
