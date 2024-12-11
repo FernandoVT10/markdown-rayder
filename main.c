@@ -203,7 +203,32 @@ MDList get_parsed_markdown()
 
 void free_md_list(MDList list)
 {
-    // TODO
+    MDNode *node = list.head;
+    MDNode *old_node = NULL;
+
+    while(node != NULL) {
+        switch(node->type) {
+            case TEXT_NODE: {
+                TextNode *t_node = (TextNode*)node->data;
+                free(t_node->text);
+            } break;
+            case OLIST_INDICATOR_NODE: {
+                OListIndicatorNode *l_node = (OListIndicatorNode*)node->data;
+                free(l_node->indicator);
+            } break;
+            case NEWLINE_NODE:
+            case TAB_NODE:
+            case ULIST_INDICATOR_NODE:
+                break;
+        }
+
+        free(node->data);
+
+        old_node = node;
+        node = node->next;
+
+        free(old_node);
+    }
 }
 
 void load_fonts()
