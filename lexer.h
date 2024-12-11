@@ -48,6 +48,8 @@ enum TokenType {
     TKN_ULIST_INDICATOR, // unordered list
     TKN_OLIST_INDICATOR, // ordered list
     TKN_TAB,
+    TKN_LINK_TEXT,
+    TKN_LINK_DEST,
 };
 
 typedef struct Token {

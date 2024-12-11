@@ -96,7 +96,7 @@ enum TokenType get_header_type(int level)
 // returns true for any char that belong to an inline token
 bool is_special_char(char c)
 {
-    return c == '\n' || c == EOF || c == '*' || c == '`' || c == '_';
+    return c == '\n' || c == EOF || c == '*' || c == '`' || c == '_' || c == '[';
 }
 
 void copy_buf_to_string(String *str, char *buf, size_t buf_size)
@@ -236,6 +236,46 @@ void lexer_process_next_token()
             lexer_rewind(1);
         }
         return;
+    }
+
+    // LINKS
+    // LINK TEXT
+    if(c == '[') {
+        int char_count = 0;
+        int start_pos = lexer.cursor;
+
+        char next_char = lexer_peek_n_char(char_count);
+        while(next_char != ']' && next_char != '\n') {
+            char_count++;
+            next_char = lexer_peek_n_char(char_count);
+        }
+
+        if(next_char == ']') {
+            lexer_advance_n(char_count + 1);
+            lexer.token.type = TKN_LINK_TEXT;
+            int copy_size = lexer.cursor - start_pos - 1;
+            copy_buf_to_string(&lexer.token.lexeme, lexer.buf + start_pos, copy_size);
+            return;
+        }
+    }
+    // LINK DESTINATION
+    if(c == '(' && lexer_is_prev_token(TKN_LINK_TEXT)) {
+        int char_count = 0;
+        int start_pos = lexer.cursor;
+
+        char next_char = lexer_peek_n_char(char_count);
+        while(next_char != ')' && next_char != '\n') {
+            char_count++;
+            next_char = lexer_peek_n_char(char_count);
+        }
+
+        if(next_char == ')') {
+            lexer_advance_n(char_count + 1);
+            lexer.token.type = TKN_LINK_DEST;
+            int copy_size = lexer.cursor - start_pos - 1;
+            copy_buf_to_string(&lexer.token.lexeme, lexer.buf + start_pos, copy_size);
+            return;
+        }
     }
 
     // TEXT

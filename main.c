@@ -43,6 +43,12 @@ typedef struct NewLineNode {
     int line_height; // this refers to the height of the line where the new line appeared
 } NewLineNode;
 
+typedef struct LinkNode {
+    char *text;
+    char *dest;
+    bool hover;
+} LinkNode;
+
 typedef struct Fonts {
     Font regular;
     Font bold;
@@ -56,6 +62,7 @@ enum MDNodeType {
     OLIST_INDICATOR_NODE,
     NEWLINE_NODE,
     TAB_NODE,
+    LINK_NODE,
 };
 
 typedef struct MDNode MDNode;
@@ -192,6 +199,20 @@ MDList get_parsed_markdown()
             case TKN_TAB: {
                 insert_end_list_item(&list, TAB_NODE, NULL);
             } break;
+            case TKN_LINK_TEXT: {
+                LinkNode *node = calloc(sizeof(LinkNode), 1);
+                node->text = strdup(token->lexeme.items);
+                insert_end_list_item(&list, LINK_NODE, node);
+            } break;
+            case TKN_LINK_DEST: {
+                MDNode *node = list.tail;
+                // TKN_LINK_TEXT should always appear before this token
+                // and therefore should create the necessary node
+                assert(node->type == LINK_NODE);
+
+                LinkNode *l_node = (LinkNode*)node->data;
+                l_node->dest = strdup(token->lexeme.items);
+            } break;
             case TKN_EOF: UNREACHABLE("END_OF_FILE reached");
         }
 
@@ -215,6 +236,11 @@ void free_md_list(MDList list)
             case OLIST_INDICATOR_NODE: {
                 OListIndicatorNode *l_node = (OListIndicatorNode*)node->data;
                 free(l_node->indicator);
+            } break;
+            case LINK_NODE: {
+                LinkNode *l_node = (LinkNode*)node->data;
+                free(l_node->text);
+                free(l_node->dest);
             } break;
             case NEWLINE_NODE:
             case TAB_NODE:
@@ -318,6 +344,69 @@ void draw_list_indicator(Vector2 *pos, OListIndicatorNode *node)
     pos->x += size.x;
 }
 
+void open_link(char *dest)
+{
+    const char *cmd = "open ";
+    char *full_cmd = malloc(strlen(cmd) + strlen(dest) + 1);
+
+    strcpy(full_cmd, cmd);
+    strcat(full_cmd, dest);
+
+    system(full_cmd);
+}
+
+void handle_link(Vector2 *pos, LinkNode *node)
+{
+    int spacing = 2;
+    Font font = state.fonts.regular;
+    Vector2 size = MeasureTextEx(font, node->text, DEFAULT_FONT_SIZE, spacing);
+
+    Vector2 mouse_pos = GetMousePosition();
+    Rectangle link_boundary = {
+        .x = pos->x,
+        .y = pos->y,
+        .width = size.x,
+        .height = size.y,
+    };
+
+    // we use hover like this just to call SetMouseCursor once
+    if(CheckCollisionPointRec(mouse_pos, link_boundary)) {
+        if(!node->hover) {
+            node->hover = true;
+            SetMouseCursor(MOUSE_CURSOR_POINTING_HAND);
+        }
+    } else {
+        if(node->hover) {
+            node->hover = false;
+            SetMouseCursor(MOUSE_CURSOR_DEFAULT);
+        }
+    }
+
+
+    if(node->hover && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+        open_link(node->dest);
+    }
+
+    Color color = node->hover ? MD_BLUE : MD_WHITE;
+    // draw link text
+    DrawTextEx(font, node->text, *pos, DEFAULT_FONT_SIZE, spacing, color);
+
+    // draw line below text
+    float line_pos_y = pos->y + size.y;
+    Vector2 start_line = {
+        .x = pos->x,
+        .y = line_pos_y
+    };
+    Vector2 end_line = {
+        .x = pos->x + size.x,
+        .y = line_pos_y
+    };
+    float thickness = 1;
+    DrawLineEx(start_line, end_line, thickness, color);
+
+    pos->x += size.x;
+}
+
 int main(void)
 {
     const char *file_path = "./examples/partial-example.md";
@@ -378,6 +467,9 @@ int main(void)
                 } break;
                 case TAB_NODE: {
                     draw_pos.x += TAB_SIZE;
+                } break;
+                case LINK_NODE: {
+                    handle_link(&draw_pos, (LinkNode*)node->data);
                 } break;
             }
 
