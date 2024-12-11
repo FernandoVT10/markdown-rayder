@@ -61,7 +61,7 @@ typedef struct LinkNode {
 } LinkNode;
 
 typedef struct ImageNode {
-    Texture2D image_texture;
+    Texture2D *texture;
     char *alt;
 } ImageNode;
 
@@ -138,78 +138,68 @@ int get_header_font_size(enum TokenType type)
     }
 }
 
-struct MemoryStruct {
-  char *memory;
+typedef struct ImageChunk {
+  char *data;
   size_t size;
-};
+} ImageChunk;
 
 static size_t write_memory_callback(void *contents, size_t size, size_t nmemb, void *chunk)
 {
-    size_t realsize = size * nmemb;
-    struct MemoryStruct *mem = (struct MemoryStruct *)chunk;
+    size_t real_size = size * nmemb;
+    ImageChunk *image_chunk = (ImageChunk *)chunk;
 
-    char *ptr = realloc(mem->memory, mem->size + realsize + 1);
+    char *ptr = realloc(image_chunk->data, image_chunk->size + real_size + 1);
     if(!ptr) {
-        /* out of memory! */
-        printf("not enough memory (realloc returned NULL)\n");
+        TraceLog(LOG_ERROR, "Error trying to reallocate memory for the image chunk");
         return 0;
     }
 
-    mem->memory = ptr;
-    memcpy(&(mem->memory[mem->size]), contents, realsize);
-    mem->size += realsize;
-    mem->memory[mem->size] = 0;
+    image_chunk->data = ptr;
+    memcpy(&(image_chunk->data[image_chunk->size]), contents, real_size);
+    image_chunk->size += real_size;
+    image_chunk->data[image_chunk->size] = 0;
 
-    return realsize;
+    return real_size;
 }
 
-Texture2D load_texture_from_url(const char *image_url)
+Texture2D *load_texture_from_url(const char *image_url)
 {
     CURL *curl_handle;
     CURLcode res;
 
-    struct MemoryStruct chunk;
-
-    chunk.memory = malloc(1);  /* grown as needed by the realloc above */
-    chunk.size = 0;    /* no data at this point */
+    ImageChunk chunk = {
+        .data = malloc(1),
+        .size = 0,
+    };
 
     curl_global_init(CURL_GLOBAL_ALL);
-
-    /* init the curl session */
     curl_handle = curl_easy_init();
 
-    /* specify URL to get */
     curl_easy_setopt(curl_handle, CURLOPT_URL, image_url);
-
-    /* send all data to this function  */
     curl_easy_setopt(curl_handle, CURLOPT_WRITEFUNCTION, write_memory_callback);
-
-    /* we pass our 'chunk' struct to the callback function */
     curl_easy_setopt(curl_handle, CURLOPT_WRITEDATA, (void *)&chunk);
-
-    /* some servers do not like requests that are made without a user-agent
-     field, so we provide one */
     curl_easy_setopt(curl_handle, CURLOPT_USERAGENT, "libcurl-agent/1.0");
 
-    /* get it! */
     res = curl_easy_perform(curl_handle);
 
-    /* check for errors */
     if(res != CURLE_OK) {
-        fprintf(stderr, "curl_easy_perform() failed: %s\n",
-                curl_easy_strerror(res));
+        TraceLog(LOG_ERROR, "curl_easy_perform() failed: %s", curl_easy_strerror(res));
+        return NULL;
     }
 
-    Image image = LoadImageFromMemory(".jpg", (unsigned char *)chunk.memory, chunk.size);
-    Texture2D texture = LoadTextureFromImage(image);
+    Image image = LoadImageFromMemory(".jpg", (unsigned char *)chunk.data, chunk.size);
+
+    if(!IsImageValid(image)) {
+        TraceLog(LOG_ERROR, "The given url %s is not a valid image", image_url);
+        return NULL;
+    }
+
+    Texture2D *texture = calloc(sizeof(Texture2D), 1);
+    *texture = LoadTextureFromImage(image);
+
     UnloadImage(image);
-
-    /* cleanup curl stuff */
     curl_easy_cleanup(curl_handle);
-
-    free(chunk.memory);
-
-    /* we are done with libcurl, so clean it up */
+    free(chunk.data);
     curl_global_cleanup();
 
     return texture;
@@ -339,7 +329,7 @@ MDList get_parsed_markdown()
                 assert(node->type == IMAGE_NODE);
                 ImageNode *i_node = (ImageNode*)node->data;
 
-                i_node->image_texture = load_texture_from_url(token->lexeme.items);
+                i_node->texture = load_texture_from_url(token->lexeme.items);
             } break;
             case TKN_EOF: UNREACHABLE("END_OF_FILE reached");
         }
@@ -373,7 +363,11 @@ void free_md_list(MDList list)
             case IMAGE_NODE: {
                 ImageNode *i_node = (ImageNode*)node->data;
                 free(i_node->alt);
-                UnloadTexture(i_node->image_texture);
+
+                if(i_node->texture != NULL)
+                    UnloadTexture(*i_node->texture);
+
+                free(i_node->texture);
             } break;
             case NEWLINE_NODE:
             case TAB_NODE:
@@ -617,9 +611,11 @@ int main(void)
                 } break;
                 case IMAGE_NODE: {
                     ImageNode *i_node = (ImageNode*)node->data;
-                    DrawTexture(i_node->image_texture, draw_pos.x, draw_pos.y, WHITE);
-                    draw_pos.x = 0;
-                    draw_pos.y += i_node->image_texture.height;
+                    if(i_node->texture != NULL) {
+                        DrawTexture(*i_node->texture, draw_pos.x, draw_pos.y, WHITE);
+                        draw_pos.x = 0;
+                        draw_pos.y += i_node->texture->height;
+                    }
                 } break;
             }
 
