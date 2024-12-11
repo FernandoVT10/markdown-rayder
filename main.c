@@ -539,6 +539,24 @@ void handle_link(Vector2 *pos, LinkNode *node)
     pos->x += size.x;
 }
 
+void draw_image_node(Vector2 *pos, ImageNode *node)
+{
+    if(node->texture == NULL) return;
+
+    int screen_width = GetScreenWidth();
+
+    if(node->texture->width > screen_width) {
+        float scale = screen_width / (float)node->texture->width;
+        DrawTextureEx(*node->texture, *pos, 0, scale, WHITE);
+        pos->x = 0;
+        pos->y += node->texture->height * scale;
+    } else {
+        DrawTexture(*node->texture, pos->x, pos->y, WHITE);
+        pos->x = 0;
+        pos->y += node->texture->height;
+    }
+}
+
 int main(void)
 {
     InitWindow(1280, 720, "Markdown RayDer");
@@ -611,11 +629,7 @@ int main(void)
                 } break;
                 case IMAGE_NODE: {
                     ImageNode *i_node = (ImageNode*)node->data;
-                    if(i_node->texture != NULL) {
-                        DrawTexture(*i_node->texture, draw_pos.x, draw_pos.y, WHITE);
-                        draw_pos.x = 0;
-                        draw_pos.y += i_node->texture->height;
-                    }
+                    draw_image_node(&draw_pos, i_node);
                 } break;
             }
 
