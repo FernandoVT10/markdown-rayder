@@ -162,6 +162,25 @@ static size_t write_memory_callback(void *contents, size_t size, size_t nmemb, v
     return real_size;
 }
 
+// dest should allocate enough data for 4 chars and one for null char
+// NOTE: if the extension is not found or the extension is bigger than 4 chars
+// we do nothing to the dest string
+void get_image_ext(char *dest, const char *path)
+{
+    int dot_pos = -1;
+
+    for(size_t i = strlen(path) - 1; i > 0; i--) {
+        if(path[i] != '.') continue;
+        dot_pos = i;
+        break;
+    }
+
+    // image extensions usually are not longer than 4 chars
+    if(dot_pos < 0 || strlen(path + dot_pos) > 4) return;
+
+    strcpy(dest, path + dot_pos);
+}
+
 Texture2D *load_texture_from_url(const char *image_url)
 {
     CURL *curl_handle;
@@ -187,7 +206,9 @@ Texture2D *load_texture_from_url(const char *image_url)
         return NULL;
     }
 
-    Image image = LoadImageFromMemory(".jpg", (unsigned char *)chunk.data, chunk.size);
+    char image_ext[5] = ".jpg";
+    get_image_ext(image_ext, image_url);
+    Image image = LoadImageFromMemory(image_ext, (unsigned char *)chunk.data, chunk.size);
 
     if(!IsImageValid(image)) {
         TraceLog(LOG_ERROR, "The given url %s is not a valid image", image_url);
