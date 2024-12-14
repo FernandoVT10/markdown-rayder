@@ -258,8 +258,9 @@ MDList get_parsed_markdown()
                 ImageNode *i_node = (ImageNode*)node->data;
 
                 i_node->url = strdup(token->lexeme.items);
+                i_node->loading_image = true;
 
-                image_loader_load(i_node);
+                image_loader_async_load(i_node);
             } break;
             case TKN_EOF: UNREACHABLE("END_OF_FILE reached");
         }
@@ -467,6 +468,8 @@ int main(void)
 {
     InitWindow(1280, 720, "Markdown RayDer");
     SetTargetFPS(60);
+    image_loader_init();
+
     const char *file_path = "./examples/partial-example.md";
 
     assert(lexer_init(file_path));
@@ -550,6 +553,8 @@ int main(void)
     free_md_list(list);
 
     CloseWindow();
+
+    image_loader_destroy();
 
     return 0;
 }

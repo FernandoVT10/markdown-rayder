@@ -18,7 +18,7 @@ typedef struct ImageChunk {
 void image_loader_init();
 void image_loader_destroy();
 void free_image_node(ImageNode *node);
-void image_loader_load(ImageNode *node);
+void image_loader_async_load(ImageNode *node);
 
 Vector2 draw_image_node(Vector2 pos, int screen_width, ImageNode *node);
 

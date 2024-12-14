@@ -50,7 +50,6 @@ void get_image_ext(char *dest, const char *path)
 void *load_image_from_url(void *arg)
 {
     ImageNode *image_node = (ImageNode *)arg;
-    image_node->loading_image = true;
 
     CURL *curl_handle;
     CURLcode res;
@@ -59,8 +58,6 @@ void *load_image_from_url(void *arg)
         .data = malloc(1),
         .size = 0,
     };
-
-    pthread_mutex_lock(&mutex_lock);
 
     curl_global_init(CURL_GLOBAL_ALL);
     curl_handle = curl_easy_init();
@@ -79,7 +76,11 @@ void *load_image_from_url(void *arg)
 
     char image_ext[5] = ".jpg";
     get_image_ext(image_ext, image_node->url);
+
+    pthread_mutex_lock(&mutex_lock);
     image_node->image = LoadImageFromMemory(image_ext, (unsigned char *)chunk.data, chunk.size);
+    image_node->loading_image = false;
+    pthread_mutex_unlock(&mutex_lock);
 
     if(!IsImageValid(image_node->image)) {
         TraceLog(LOG_ERROR, "The given url %s is not a valid image", image_node->url);
@@ -89,9 +90,6 @@ void *load_image_from_url(void *arg)
     curl_easy_cleanup(curl_handle);
     free(chunk.data);
     curl_global_cleanup();
-
-    image_node->loading_image = false;
-    pthread_mutex_unlock(&mutex_lock);
 
     return NULL;
 }
@@ -103,13 +101,13 @@ void image_loader_init(ImageNode *node)
 
 Vector2 draw_image_node(Vector2 pos, int screen_width, ImageNode *node)
 {
-    if(node->loading_image) return Vector2Zero();
+    if(node->loading_image) {
+        return Vector2Zero();
+    }
 
     if(!node->texture_loaded) {
-        pthread_mutex_lock(&mutex_lock);
         node->texture_loaded = true;
         node->texture = LoadTextureFromImage(node->image);
-        pthread_mutex_unlock(&mutex_lock);
     }
 
     Vector2 image_size = {0};
@@ -128,7 +126,7 @@ Vector2 draw_image_node(Vector2 pos, int screen_width, ImageNode *node)
     return image_size;
 }
 
-void image_loader_load(ImageNode *node)
+void image_loader_async_load(ImageNode *node)
 {
     pthread_t tid;
     pthread_create(&tid, NULL, &load_image_from_url, node);
