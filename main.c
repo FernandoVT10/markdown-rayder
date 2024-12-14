@@ -464,18 +464,27 @@ void handle_link(Vector2 *pos, LinkNode *node)
     pos->x += size.x;
 }
 
-int main(void)
+int main(int argc, char **argv)
 {
+    if(argc < 2) {
+        TraceLog(LOG_ERROR, "file path is required");
+        return -1;
+    } else if(argc > 2) {
+        TraceLog(LOG_ERROR, "too many arguments");
+        return -1;
+    }
+
+    const char *file_path = argv[1];
+    if(!lexer_init(file_path)) {
+        return -1;
+    }
+
     InitWindow(1280, 720, "Markdown RayDer");
     SetTargetFPS(60);
+
     image_loader_init();
-
-    const char *file_path = "./examples/partial-example.md";
-
-    assert(lexer_init(file_path));
     MDList list = get_parsed_markdown();
     lexer_destroy();
-
     load_fonts();
 
     Vector2 camera_pos = {0};
@@ -551,7 +560,6 @@ int main(void)
 
     unload_fonts();
     free_md_list(list);
-
     CloseWindow();
 
     image_loader_destroy();

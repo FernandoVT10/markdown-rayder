@@ -1,13 +1,27 @@
 #include <ctype.h>
+#include <sys/types.h>
+#include <sys/stat.h>
 #include "lexer.h"
 
 Lexer lexer = {0};
 
 char *load_file_contents(const char *path)
 {
+    struct stat buf_stat;
+    if(stat(path, &buf_stat) == -1) {
+        TraceLog(LOG_ERROR, "Couldn't open file %s: %s", path, strerror(errno));
+        return NULL;
+    }
+
+    if((buf_stat.st_mode & S_IFMT) != S_IFREG) {
+        TraceLog(LOG_ERROR, "%s is not a valid file path", path);
+        return NULL;
+    }
+
     FILE *file = fopen(path, "r");
 
     if(file == NULL) {
+        TraceLog(LOG_ERROR, "Couldn't open file %s: %s\n", path, strerror(errno));
         return NULL;
     }
 
@@ -36,7 +50,6 @@ bool lexer_init(const char *file_path)
     lexer.cursor = 0;
 
     if(!lexer.buf) {
-        TraceLog(LOG_ERROR, "Couldn't open file %s: %s\n", file_path, strerror(errno));
         return false;
     }
 
