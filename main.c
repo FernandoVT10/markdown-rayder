@@ -1,7 +1,7 @@
 #include "raylib.h"
 #include "raymath.h"
 #include "lexer.h"
-#include <curl/curl.h>
+#include "image.h"
 
 #define MD_BLACK CLITERAL(Color){9, 9, 17, 255}
 #define MD_WHITE CLITERAL(Color){221, 221, 244, 255}
@@ -59,11 +59,6 @@ typedef struct LinkNode {
     char *dest;
     bool hover;
 } LinkNode;
-
-typedef struct ImageNode {
-    Texture2D *texture;
-    char *alt;
-} ImageNode;
 
 typedef struct MDNode MDNode;
 
@@ -136,94 +131,6 @@ int get_header_font_size(enum TokenType type)
         default:
             return DEFAULT_FONT_SIZE;
     }
-}
-
-typedef struct ImageChunk {
-  char *data;
-  size_t size;
-} ImageChunk;
-
-static size_t write_memory_callback(void *contents, size_t size, size_t nmemb, void *chunk)
-{
-    size_t real_size = size * nmemb;
-    ImageChunk *image_chunk = (ImageChunk *)chunk;
-
-    char *ptr = realloc(image_chunk->data, image_chunk->size + real_size + 1);
-    if(!ptr) {
-        TraceLog(LOG_ERROR, "Error trying to reallocate memory for the image chunk");
-        return 0;
-    }
-
-    image_chunk->data = ptr;
-    memcpy(&(image_chunk->data[image_chunk->size]), contents, real_size);
-    image_chunk->size += real_size;
-    image_chunk->data[image_chunk->size] = 0;
-
-    return real_size;
-}
-
-// dest should allocate enough data for 4 chars and one for null char
-// NOTE: if the extension is not found or the extension is bigger than 4 chars
-// we do nothing to the dest string
-void get_image_ext(char *dest, const char *path)
-{
-    int dot_pos = -1;
-
-    for(size_t i = strlen(path) - 1; i > 0; i--) {
-        if(path[i] != '.') continue;
-        dot_pos = i;
-        break;
-    }
-
-    // image extensions usually are not longer than 4 chars
-    if(dot_pos < 0 || strlen(path + dot_pos) > 4) return;
-
-    strcpy(dest, path + dot_pos);
-}
-
-Texture2D *load_texture_from_url(const char *image_url)
-{
-    CURL *curl_handle;
-    CURLcode res;
-
-    ImageChunk chunk = {
-        .data = malloc(1),
-        .size = 0,
-    };
-
-    curl_global_init(CURL_GLOBAL_ALL);
-    curl_handle = curl_easy_init();
-
-    curl_easy_setopt(curl_handle, CURLOPT_URL, image_url);
-    curl_easy_setopt(curl_handle, CURLOPT_WRITEFUNCTION, write_memory_callback);
-    curl_easy_setopt(curl_handle, CURLOPT_WRITEDATA, (void *)&chunk);
-    curl_easy_setopt(curl_handle, CURLOPT_USERAGENT, "libcurl-agent/1.0");
-
-    res = curl_easy_perform(curl_handle);
-
-    if(res != CURLE_OK) {
-        TraceLog(LOG_ERROR, "curl_easy_perform() failed: %s", curl_easy_strerror(res));
-        return NULL;
-    }
-
-    char image_ext[5] = ".jpg";
-    get_image_ext(image_ext, image_url);
-    Image image = LoadImageFromMemory(image_ext, (unsigned char *)chunk.data, chunk.size);
-
-    if(!IsImageValid(image)) {
-        TraceLog(LOG_ERROR, "The given url %s is not a valid image", image_url);
-        return NULL;
-    }
-
-    Texture2D *texture = calloc(sizeof(Texture2D), 1);
-    *texture = LoadTextureFromImage(image);
-
-    UnloadImage(image);
-    curl_easy_cleanup(curl_handle);
-    free(chunk.data);
-    curl_global_cleanup();
-
-    return texture;
 }
 
 MDList get_parsed_markdown()
@@ -350,7 +257,9 @@ MDList get_parsed_markdown()
                 assert(node->type == IMAGE_NODE);
                 ImageNode *i_node = (ImageNode*)node->data;
 
-                i_node->texture = load_texture_from_url(token->lexeme.items);
+                i_node->url = strdup(token->lexeme.items);
+
+                image_loader_load(i_node);
             } break;
             case TKN_EOF: UNREACHABLE("END_OF_FILE reached");
         }
@@ -382,13 +291,7 @@ void free_md_list(MDList list)
                 free(l_node->dest);
             } break;
             case IMAGE_NODE: {
-                ImageNode *i_node = (ImageNode*)node->data;
-                free(i_node->alt);
-
-                if(i_node->texture != NULL)
-                    UnloadTexture(*i_node->texture);
-
-                free(i_node->texture);
+                free_image_node((ImageNode *)node->data);
             } break;
             case NEWLINE_NODE:
             case TAB_NODE:
@@ -560,24 +463,6 @@ void handle_link(Vector2 *pos, LinkNode *node)
     pos->x += size.x;
 }
 
-void draw_image_node(Vector2 *pos, ImageNode *node)
-{
-    if(node->texture == NULL) return;
-
-    int screen_width = GetScreenWidth();
-
-    if(node->texture->width > screen_width) {
-        float scale = screen_width / (float)node->texture->width;
-        DrawTextureEx(*node->texture, *pos, 0, scale, WHITE);
-        pos->x = 0;
-        pos->y += node->texture->height * scale;
-    } else {
-        DrawTexture(*node->texture, pos->x, pos->y, WHITE);
-        pos->x = 0;
-        pos->y += node->texture->height;
-    }
-}
-
 int main(void)
 {
     InitWindow(1280, 720, "Markdown RayDer");
@@ -650,7 +535,8 @@ int main(void)
                 } break;
                 case IMAGE_NODE: {
                     ImageNode *i_node = (ImageNode*)node->data;
-                    draw_image_node(&draw_pos, i_node);
+                    Vector2 image_size = draw_image_node(draw_pos, screen_width, i_node);
+                    draw_pos = Vector2Add(draw_pos, image_size);
                 } break;
             }
 
