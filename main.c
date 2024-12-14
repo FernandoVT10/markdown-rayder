@@ -9,6 +9,7 @@
 #define MD_TRANSPARENT CLITERAL(Color){0}
 #define MD_BLUE CLITERAL(Color){133, 170, 249, 255}
 
+#define LINE_HEIGHT 1.5
 #define DEFAULT_FONT_SIZE 20
 
 // HEADERS
@@ -311,7 +312,7 @@ void free_md_list(MDList list)
 
 void load_fonts()
 {
-    int load_font_size = 72;
+    int load_font_size = DEFAULT_FONT_SIZE;
     state.fonts.regular = LoadFontEx("./fonts/Poppins-Regular.ttf", load_font_size, NULL, 0);
     state.fonts.bold = LoadFontEx("./fonts/Poppins-Bold.ttf", load_font_size, NULL, 0);
     state.fonts.italic = LoadFontEx("./fonts/Poppins-Italic.ttf", load_font_size, NULL, 0);
@@ -355,7 +356,7 @@ Vector2 draw_text_node(Vector2 pos, int start_bound, int end_bound, TextNode *no
 
         if(pos.x + size.x > end_bound) {
             pos.x = start_bound;
-            pos.y += size.y;
+            pos.y += size.y + LINE_HEIGHT * node->font_size;
         }
 
         DrawTextEx(font, word, pos, node->font_size, spacing, node->color);
@@ -526,7 +527,7 @@ int main(int argc, char **argv)
             switch(node->type) {
                 case TEXT_NODE: {
                     TextNode *text_node = (TextNode*)node->data;
-                    draw_pos = draw_text_node(draw_pos, 20, screen_width - 20, text_node);
+                    draw_pos = draw_text_node(draw_pos, 0, screen_width, text_node);
                 } break;
                 case NEWLINE_NODE: {
                     NewLineNode *n_node = (NewLineNode*)node->data;
