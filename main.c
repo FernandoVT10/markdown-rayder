@@ -4,6 +4,7 @@
 #include "image.h"
 
 #define MD_BLACK CLITERAL(Color){9, 9, 17, 255}
+#define MD_BLACK_LIGHT CLITERAL(Color){20, 21, 31, 255}
 #define MD_WHITE CLITERAL(Color){221, 221, 244, 255}
 #define MD_BLUE_BG CLITERAL(Color){133, 170, 249, 10}
 #define MD_TRANSPARENT CLITERAL(Color){0}
@@ -37,6 +38,7 @@ enum MDNodeType {
     TAB_NODE,
     LINK_NODE,
     IMAGE_NODE,
+    CODE_BLOCK_NODE,
 };
 
 typedef struct TextNode {
@@ -60,6 +62,10 @@ typedef struct LinkNode {
     char *dest;
     bool hover;
 } LinkNode;
+
+typedef struct CodeBlockNode {
+    char *contents;
+} CodeBlockNode;
 
 typedef struct MDNode MDNode;
 
@@ -263,6 +269,17 @@ MDList get_parsed_markdown()
 
                 image_loader_async_load(i_node);
             } break;
+            case TKN_CODE_BLOCK: {
+                CodeBlockNode *c_node = calloc(sizeof(CodeBlockNode), 1);
+
+                if(c_node == NULL) {
+                    TraceLog(LOG_ERROR, "Trying to allocate memory for a CodeBlockNode");
+                    break;
+                }
+
+                c_node->contents = strdup(token->lexeme.items);
+                insert_end_list_item(&list, CODE_BLOCK_NODE, c_node);
+            } break;
             case TKN_EOF: UNREACHABLE("END_OF_FILE reached");
         }
 
@@ -294,6 +311,10 @@ void free_md_list(MDList list)
             } break;
             case IMAGE_NODE: {
                 free_image_node((ImageNode *)node->data);
+            } break;
+            case CODE_BLOCK_NODE: {
+                CodeBlockNode *c_node = (CodeBlockNode*)node->data;
+                free(c_node->contents);
             } break;
             case NEWLINE_NODE:
             case TAB_NODE:
@@ -550,6 +571,26 @@ int main(int argc, char **argv)
                     ImageNode *i_node = (ImageNode*)node->data;
                     Vector2 image_size = draw_image_node(draw_pos, screen_width, i_node);
                     draw_pos = Vector2Add(draw_pos, image_size);
+                } break;
+                case CODE_BLOCK_NODE: {
+                    CodeBlockNode *c_node = (CodeBlockNode*)node->data;
+
+                    int spacing = 2;
+                    Font font = state.fonts.regular;
+                    int padding = 20;
+
+                    Vector2 text_size = MeasureTextEx(font, c_node->contents, DEFAULT_FONT_SIZE, spacing);
+                    DrawRectangle(0, draw_pos.y, screen_width, text_size.y + padding * 2, MD_BLACK_LIGHT);
+
+                    Vector2 text_pos = {
+                        draw_pos.x + padding,
+                        draw_pos.y + padding,
+                    };
+
+                    DrawTextEx(font, c_node->contents, text_pos, DEFAULT_FONT_SIZE, spacing, MD_WHITE);
+
+                    draw_pos.x += screen_width;
+                    draw_pos.y += text_size.y + padding * 2 - DEFAULT_FONT_SIZE;
                 } break;
             }
 

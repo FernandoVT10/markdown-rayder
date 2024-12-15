@@ -236,6 +236,39 @@ void lexer_process_next_token()
         return;
     }
 
+    // CODE BLOCKS
+    // NOTE: this part should be before the inline code
+    if(c == '`' && lexer_is_prev_token_whitespace()) {
+        int tick_count = 1;
+        while(lexer_peek_n_char(tick_count - 1) == '`') tick_count++;
+
+        if(tick_count >= 3) {
+            lexer_advance_n(tick_count - 1);
+
+            lexer.token.type = TKN_CODE_BLOCK;
+            lexer.token.lexeme.count = 0;
+
+            while((c = lexer_get_and_advance()) != EOF) {
+                if(c == '\n' && lexer_is_next_char('`')) {
+                    int tick_count = 1;
+                    while(lexer_peek_n_char(tick_count - 1) == '`') tick_count++;
+
+
+                    if(tick_count >= 3) {
+                        lexer_advance_n(tick_count);
+                        da_append(&lexer.token.lexeme, '\0');
+                        return;
+                    }
+                }
+
+                da_append(&lexer.token.lexeme, c);
+            }
+
+            da_append(&lexer.token.lexeme, '\0');
+            return;
+        }
+    }
+
     // INLINE CODE
     if(c == '`') {
         lexer.token.type = TKN_CODE;
