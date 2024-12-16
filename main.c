@@ -1,3 +1,4 @@
+#include <string.h>
 #include "raylib.h"
 #include "raymath.h"
 #include "lexer.h"

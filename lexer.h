@@ -1,13 +1,9 @@
 #ifndef LEXER_H_
 #define LEXER_H_
 
-#include <stdio.h>
-#include <stdbool.h>
-#include <stdlib.h>
-#include <string.h>
-#include <errno.h>
 #include <assert.h>
-#include "raylib.h"
+#include <stdlib.h>
+#include <stdio.h>
 
 #define DA_INIT_CAP 256
 

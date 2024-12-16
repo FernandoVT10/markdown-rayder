@@ -1,6 +1,12 @@
+#include <stdbool.h>
+#include <string.h>
 #include <ctype.h>
+#include <stdlib.h>
+#include <errno.h>
+#include <stdio.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include "raylib.h"
 #include "lexer.h"
 
 Lexer lexer = {0};
