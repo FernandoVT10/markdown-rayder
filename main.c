@@ -1,7 +1,10 @@
 #include <string.h>
-#include "raylib.h"
-#include "raymath.h"
+#include <stdio.h>
 #include "lexer.h"
+#include "raylib.h"
+#include "parser.h"
+#if 0
+#include "raymath.h"
 #include "image.h"
 
 #define MD_BLACK CLITERAL(Color){9, 9, 17, 255}
@@ -609,3 +612,51 @@ int main(int argc, char **argv)
 
     return 0;
 }
+#else
+void pretty_ast_print(ASTNode *ast, int pad_size)
+{
+    while(pad_size > 0) {
+        printf(" ");
+        pad_size--;
+    }
+
+    switch(ast->type) {
+        case AST_TEXT_NODE: {
+            TextNode *text_node = (TextNode*)ast->data;
+            printf("TEXT(%s)\n", text_node->text);
+        } break;
+        case AST_BODY_NODE: {
+            BodyNode *body_node = (BodyNode*)ast->data;
+            ListNode *child = body_node->children->head;
+
+            while(child != NULL) {
+                ASTNode *child_node = (ASTNode*)child->data;
+                pretty_ast_print(child_node, pad_size + 4);
+
+                child = child->next;
+            }
+        } break;
+        case AST_NEWLINE_NODE: {
+            printf("NEWLINE()\n");
+        } break;
+    }
+}
+
+int main(int argc, char **argv)
+{
+    if(argc < 2) {
+        TraceLog(LOG_ERROR, "file path is required");
+        return -1;
+    } else if(argc > 2) {
+        TraceLog(LOG_ERROR, "too many arguments");
+        return -1;
+    }
+
+    const char *file_path = argv[1];
+
+    ASTNode *body_node = parse_file(file_path);
+    pretty_ast_print(body_node, -4);
+
+    return 0;
+}
+#endif

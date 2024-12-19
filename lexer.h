@@ -4,6 +4,8 @@
 #include <assert.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <stdbool.h>
+#include "linklist.h"
 
 #define DA_INIT_CAP 256
 
@@ -29,43 +31,35 @@ typedef struct String {
 } String;
 
 enum TokenType {
-    TKN_HEADER_1,
-    TKN_HEADER_2,
-    TKN_HEADER_3,
-    TKN_HEADER_4,
-    TKN_HEADER_5,
-    TKN_HEADER_6,
-    TKN_NEWLINE,
     TKN_TEXT,
     TKN_EOF,
-    TKN_ITALIC,
-    TKN_BOLD,
-    TKN_CODE,
-    TKN_ULIST_INDICATOR, // unordered list
-    TKN_OLIST_INDICATOR, // ordered list
-    TKN_TAB,
-    TKN_LINK_TEXT,
-    TKN_LINK_DEST,
-    TKN_IMAGE_ALT,
-    TKN_IMAGE_URL,
-    TKN_CODE_BLOCK,
+    TKN_NEWLINE,
+    // TKN_HASH,
+    // TKN_ATERISK,
+    // TKN_BACKTICK,
+    // TKN_DASH,
+    // TKN_DOT,
+    // TKN_NUMBER,
+    // TKN_TAB,
+    // TKN_OPEN_SQR_BRACKET, TKN_CLOSE_SQR_BRACKET,
+    // TKN_OPEN_PARENTHESIS, TKN_CLOSE_PARENTHESIS,
+    // TKN_EXCLAMATION,
 };
 
 typedef struct Token {
   enum TokenType type;
-  String lexeme;
+  char *lexeme;
 } Token;
 
 typedef struct Lexer {
     char *buf;
     int cursor;
     size_t token_count;
-    Token prev_token;
-    Token token;
+
+    LinkList *tokens;
 } Lexer;
 
 bool lexer_init(const char *file_path);
-bool lexer_is_prev_token(enum TokenType type);
 Token *lexer_next_token();
 void lexer_destroy();
 
