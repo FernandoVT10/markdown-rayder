@@ -10,13 +10,19 @@ typedef struct BodyNode {
 } BodyNode;
 
 typedef struct TextNode {
-    char *text;
+    char *contents;
 } TextNode;
+
+typedef struct HeaderNode {
+  LinkList *children;
+  int level;
+} HeaderNode;
 
 enum ASTNodeType {
     AST_TEXT_NODE,
     AST_BODY_NODE,
     AST_NEWLINE_NODE,
+    AST_HEADER_NODE,
 };
 
 typedef struct ASTNode {

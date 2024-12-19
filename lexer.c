@@ -49,31 +49,27 @@ char *load_file_contents(const char *path)
 
 Token *lexer_add_tkn(enum TokenType type, const char *lexeme)
 {
-    Token *token = malloc(sizeof(Token));
-    token->type = type;
+    Token token = {0};
+    token.type = type;
 
     if(lexeme) {
-        token->lexeme = strdup(lexeme);
+        token.lexeme = strdup(lexeme);
     } else {
-        token->lexeme = NULL;
+        token.lexeme = NULL;
     }
 
-    list_insert_item_at_end(lexer.tokens, token);
-    return token;
+    da_append(&lexer.tokens, token);
+    return &lexer.tokens.items[lexer.tokens.count - 1];
 }
 
 bool lexer_init(const char *file_path)
 {
     lexer.buf = load_file_contents(file_path);
     lexer.cursor = 0;
-    lexer.tokens = list_create();
 
-    if(!lexer.buf || !lexer.tokens) {
+    if(!lexer.buf) {
         return false;
     }
-
-    lexer_add_tkn(TKN_EOF, NULL);
-    lexer_add_tkn(TKN_NEWLINE, NULL);
 
     return true;
 }
@@ -102,28 +98,12 @@ void lexer_rewind(int n)
     }
 }
 
-Token *lexer_get_tkn(enum TokenType type)
-{
-    ListNode *node = lexer.tokens->head;
-    while(node != NULL) {
-        Token *token = (Token *)node->data;
-
-        if(token->type == type) {
-            return token;
-        }
-
-        node = node->next;
-    }
-
-    TraceLog(LOG_ERROR, "Token '%u' not found", type);
-
-    return NULL;
-}
-
 bool is_special_char(char c)
 {
     return c == EOF
-        || c == '\n';
+        || c == '\n'
+        || c == '#'
+        || c == ' ';
     // return c == '\n'
     //     || c == '#';
     //     || c == EOF
@@ -133,12 +113,16 @@ bool is_special_char(char c)
     //     || c == '[';
 }
 
-Token *lexer_next_token()
+void process_next_tkn()
 {
     char c = lexer_get_and_adv();
 
-    if(c == '\n') return lexer_get_tkn(TKN_NEWLINE);
-    if(c == EOF) return lexer_get_tkn(TKN_EOF);
+    switch(c) {
+        case EOF: lexer_add_tkn(TKN_EOF, NULL); return;
+        case '\n': lexer_add_tkn(TKN_NEWLINE, NULL); return;
+        case '#': lexer_add_tkn(TKN_HASH, NULL); return;
+        case ' ': lexer_add_tkn(TKN_SPACE, NULL); return;
+    }
 
     // TEXT
     int start_pos = lexer.cursor - 1;
@@ -154,7 +138,35 @@ Token *lexer_next_token()
     int length = lexer.cursor - start_pos;
 
     const char *lexeme = TextSubtext(lexer.buf, start_pos, length);
-    return lexer_add_tkn(TKN_TEXT, lexeme);
+    lexer_add_tkn(TKN_TEXT, lexeme);
+}
+
+Token *lexer_get_tkn(int pos)
+{
+    if(pos < 0) pos = 0;
+
+    if(pos >= lexer.tokens.count) {
+        process_next_tkn();
+        return &lexer.tokens.items[lexer.tokens.count - 1];
+    }
+
+    return &lexer.tokens.items[pos];
+}
+
+Token *lexer_next_tkn()
+{
+    return lexer_get_tkn(lexer.tkn_cursor++);
+}
+
+bool lexer_is_n_tkn(enum TokenType type, int n)
+{
+    Token *token = lexer_get_tkn(lexer.tkn_cursor + n);
+    return token->type == type;
+}
+
+void lexer_adv_tkn_cursor(int n)
+{
+    lexer.tkn_cursor += n;
 }
 
 void lexer_destroy()

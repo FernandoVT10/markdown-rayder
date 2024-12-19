@@ -622,8 +622,8 @@ void pretty_ast_print(ASTNode *ast, int pad_size)
 
     switch(ast->type) {
         case AST_TEXT_NODE: {
-            TextNode *text_node = (TextNode*)ast->data;
-            printf("TEXT(%s)\n", text_node->text);
+            TextNode *text = (TextNode*)ast->data;
+            printf("TEXT(%s)\n", text->contents);
         } break;
         case AST_BODY_NODE: {
             BodyNode *body_node = (BodyNode*)ast->data;
@@ -635,6 +635,20 @@ void pretty_ast_print(ASTNode *ast, int pad_size)
 
                 child = child->next;
             }
+        } break;
+        case AST_HEADER_NODE: {
+            HeaderNode *header = (HeaderNode*)ast->data;
+
+            printf("HEADER(%u) {\n", header->level);
+            ListNode *child = header->children->head;
+
+            while(child != NULL) {
+                ASTNode *child_node = (ASTNode*)child->data;
+                pretty_ast_print(child_node, pad_size + 4);
+
+                child = child->next;
+            }
+            printf("} HEADER\n");
         } break;
         case AST_NEWLINE_NODE: {
             printf("NEWLINE()\n");

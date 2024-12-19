@@ -34,7 +34,8 @@ enum TokenType {
     TKN_TEXT,
     TKN_EOF,
     TKN_NEWLINE,
-    // TKN_HASH,
+    TKN_HASH,
+    TKN_SPACE,
     // TKN_ATERISK,
     // TKN_BACKTICK,
     // TKN_DASH,
@@ -51,16 +52,24 @@ typedef struct Token {
   char *lexeme;
 } Token;
 
+typedef struct Tokens {
+  Token *items;
+  size_t count;
+  size_t capacity;
+} Tokens;
+
 typedef struct Lexer {
     char *buf;
     int cursor;
-    size_t token_count;
 
-    LinkList *tokens;
+    size_t tkn_cursor;
+    Tokens tokens;
 } Lexer;
 
 bool lexer_init(const char *file_path);
-Token *lexer_next_token();
+Token *lexer_next_tkn();
+bool lexer_is_n_tkn(enum TokenType type, int n);
+void lexer_adv_tkn_cursor(int n);
 void lexer_destroy();
 
 #endif
