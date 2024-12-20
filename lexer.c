@@ -66,6 +66,7 @@ bool lexer_init(const char *file_path)
 {
     lexer.buf = load_file_contents(file_path);
     lexer.cursor = 0;
+    lexer.tkn_cursor = 0;
 
     if(!lexer.buf) {
         return false;
@@ -103,7 +104,9 @@ bool is_special_char(char c)
     return c == EOF
         || c == '\n'
         || c == '#'
-        || c == ' ';
+        || c == ' '
+        || c == '*'
+        || c == '_';
     // return c == '\n'
     //     || c == '#';
     //     || c == EOF
@@ -122,6 +125,8 @@ void process_next_tkn()
         case '\n': lexer_add_tkn(TKN_NEWLINE, NULL); return;
         case '#': lexer_add_tkn(TKN_HASH, NULL); return;
         case ' ': lexer_add_tkn(TKN_SPACE, NULL); return;
+        case '*': lexer_add_tkn(TKN_ATERISK, NULL); return;
+        case '_': lexer_add_tkn(TKN_UNDERSCORE, NULL); return;
     }
 
     // TEXT
@@ -164,9 +169,34 @@ bool lexer_is_n_tkn(enum TokenType type, int n)
     return token->type == type;
 }
 
+bool lexer_is_prev_tkn(enum TokenType type)
+{
+    // we substract by 2 instead of 1 because the cursor is always pointing
+    // to the next token
+    Token *token = lexer_get_tkn(lexer.tkn_cursor - 2);
+    return token->type == type;
+}
+
+bool lexer_is_first_tkn()
+{
+    // remember that the cursor is pointing to the next token
+    // that is why we compare with 1 instead of 0
+    // so 1 means we just processed the first token
+    return lexer.tkn_cursor == 1;
+}
+
 void lexer_adv_tkn_cursor(int n)
 {
     lexer.tkn_cursor += n;
+}
+
+void lexer_rewind_tkn_cursor(int n)
+{
+    lexer.tkn_cursor -= n;
+
+    if(lexer.tkn_cursor < 0) {
+        lexer.tkn_cursor = 0;
+    }
 }
 
 void lexer_destroy()

@@ -613,45 +613,64 @@ int main(int argc, char **argv)
     return 0;
 }
 #else
-void pretty_ast_print(ASTNode *ast, int pad_size)
+void pretty_ast_print(ASTNode *ast, int pad_size);
+
+void print_linked_list(LinkList *list, int pad_size)
+{
+    ListNode *child = list->head;
+
+    while(child != NULL) {
+        ASTNode *child_node = (ASTNode*)child->data;
+        pretty_ast_print(child_node, pad_size);
+
+        child = child->next;
+    }
+}
+
+void print_pad(int pad_size)
 {
     while(pad_size > 0) {
         printf(" ");
         pad_size--;
     }
+}
+
+void pretty_ast_print(ASTNode *ast, int pad_size)
+{
+    print_pad(pad_size);
 
     switch(ast->type) {
         case AST_TEXT_NODE: {
             TextNode *text = (TextNode*)ast->data;
-            printf("TEXT(%s)\n", text->contents);
+            printf("TEXT(%s)\n", text->items);
         } break;
         case AST_BODY_NODE: {
             BodyNode *body_node = (BodyNode*)ast->data;
-            ListNode *child = body_node->children->head;
-
-            while(child != NULL) {
-                ASTNode *child_node = (ASTNode*)child->data;
-                pretty_ast_print(child_node, pad_size + 4);
-
-                child = child->next;
-            }
+            print_linked_list(body_node->children, pad_size + 4);
         } break;
         case AST_HEADER_NODE: {
             HeaderNode *header = (HeaderNode*)ast->data;
-
             printf("HEADER(%u) {\n", header->level);
-            ListNode *child = header->children->head;
-
-            while(child != NULL) {
-                ASTNode *child_node = (ASTNode*)child->data;
-                pretty_ast_print(child_node, pad_size + 4);
-
-                child = child->next;
-            }
-            printf("} HEADER\n");
+            print_linked_list(header->children, pad_size + 4);
+            print_pad(pad_size);
+            printf("}\n");
         } break;
         case AST_NEWLINE_NODE: {
             printf("NEWLINE()\n");
+        } break;
+        case AST_ITALIC_NODE: {
+            ItalicNode *italic = (ItalicNode*)ast->data;
+            printf("ITALIC {\n");
+            print_linked_list(italic->children, pad_size + 4);
+            print_pad(pad_size);
+            printf("}\n");
+        } break;
+        case AST_BOLD_NODE: {
+            BoldNode *bold = (BoldNode*)ast->data;
+            printf("BOLD {\n");
+            print_linked_list(bold->children, pad_size + 4);
+            print_pad(pad_size);
+            printf("}\n");
         } break;
     }
 }
