@@ -4,7 +4,7 @@
 
 #define MAX_HEADER_LEVEL 6
 
-void parse_children_nodes(LinkList *parent_list, enum ASTNodeType parent_type);
+void parse_children_nodes(LinkList *parent_list, bool (*predicate)(Token *cur_tkn));
 
 void text_append(TextNode *text, const char *src)
 {
@@ -47,6 +47,37 @@ void add_text_child(LinkList *list, const char *text)
     add_child_node(list, AST_TEXT_NODE, text_node);
 }
 
+bool predicate_header(Token *cur_tkn)
+{
+    return cur_tkn->type != TKN_NEWLINE;
+}
+
+bool predicate_italic(Token *cur_tkn)
+{
+    enum TokenType t = cur_tkn->type;
+    return t != TKN_NEWLINE && t != TKN_ATERISK && t != TKN_UNDERSCORE;
+}
+
+bool predicate_bold(Token *cur_tkn)
+{
+    enum TokenType t = cur_tkn->type;
+    bool stop = t == TKN_NEWLINE
+        || (t == TKN_ATERISK  && lexer_is_n_tkn(TKN_ATERISK, 0))
+        || (t == TKN_UNDERSCORE && lexer_is_n_tkn(TKN_UNDERSCORE, 0));
+
+    if(stop && t != TKN_NEWLINE) {
+        // skip the next aterisk or underscore
+        lexer_adv_tkn_cursor(1);
+    }
+
+    return !stop;
+}
+
+bool predicate_body(Token *cur_tkn)
+{
+    return true;
+}
+
 void parse_header(LinkList *parent_list)
 {
     if(!lexer_is_prev_tkn(TKN_NEWLINE) && !lexer_is_first_tkn()) {
@@ -74,7 +105,7 @@ void parse_header(LinkList *parent_list)
     HeaderNode *header = malloc(sizeof(HeaderNode));
     header->level = level;
     header->children = list_create();
-    parse_children_nodes(header->children, AST_HEADER_NODE);
+    parse_children_nodes(header->children, &predicate_header);
 
     // rewind the new line token
     lexer_rewind_tkn_cursor(1);
@@ -82,36 +113,66 @@ void parse_header(LinkList *parent_list)
     add_child_node(parent_list, AST_HEADER_NODE, header);
 }
 
-// this function will help us to know when to stop adding nodes to the children
-// list of any node that can contain children
-bool should_parse_stop(enum ASTNodeType type, Token *cur_tkn)
+void parse_italic(LinkList *parent_list, enum TokenType cur_tkn_type)
 {
-    if(cur_tkn->type == TKN_EOF) {
-        return true;
+    bool closing_found = false;
+    int count = 0;
+    while(!lexer_is_n_tkn(TKN_NEWLINE, count) && !lexer_is_n_tkn(TKN_EOF, count)) {
+        if(lexer_is_n_tkn(cur_tkn_type, count)) {
+            closing_found = true;
+            break;
+        }
+
+        count++;
     }
 
-    switch(type) {
-        case AST_HEADER_NODE: {
-            return cur_tkn->type == TKN_NEWLINE;
+    if(!closing_found) {
+        if(cur_tkn_type == TKN_ATERISK) {
+            add_text_child(parent_list, "*");
+        } else {
+            add_text_child(parent_list, "_");
         }
-        case AST_ITALIC_NODE: {
-            enum TokenType t = cur_tkn->type;
-            return t == TKN_NEWLINE || t == TKN_UNDERSCORE || t == TKN_ATERISK;
-        }
-        case AST_BOLD_NODE: {
-            enum TokenType t = cur_tkn->type;
-            return t == TKN_NEWLINE;
-        }
-        default: return false;
+        return;
     }
+
+    ItalicNode *italic = malloc(sizeof(ItalicNode));
+    italic->children = list_create();
+    parse_children_nodes(italic->children, &predicate_italic);
+    add_child_node(parent_list, AST_ITALIC_NODE, italic);
 }
 
-// parent_list refers to the list where all the parsed nodes will be stored
-// parent_type is used to know, when we should stop adding nodes to the list
-void parse_children_nodes(LinkList *parent_list, enum ASTNodeType parent_type)
+void parse_bold(LinkList *parent_list, enum TokenType cur_tkn_type)
+{
+    bool closing_found = false;
+    int count = 0;
+    while(!lexer_is_n_tkn(TKN_NEWLINE, count) && !lexer_is_n_tkn(TKN_EOF, count)) {
+        if(lexer_is_n_tkn(cur_tkn_type, count) && lexer_is_n_tkn(cur_tkn_type, count + 1)) {
+            closing_found = true;
+            break;
+        }
+
+        count++;
+    }
+
+    if(count == 0 || !closing_found) {
+        if(cur_tkn_type == TKN_ATERISK) {
+            add_text_child(parent_list, "**");
+        } else {
+            add_text_child(parent_list, "__");
+        }
+        return;
+    }
+
+    BoldNode *bold = malloc(sizeof(BoldNode));
+    bold->children = list_create();
+    parse_children_nodes(bold->children, &predicate_bold);
+    add_child_node(parent_list, AST_BOLD_NODE, bold);
+}
+
+void parse_children_nodes(LinkList *parent_list, bool (*predicate)(Token *cur_tkn))
 {
     Token *token;
-    while((token = lexer_next_tkn()) != NULL && !should_parse_stop(parent_type, token)) {
+    while((token = lexer_next_tkn()) != NULL && token->type != TKN_EOF && predicate(token)) {
         switch(token->type) {
             case TKN_TEXT:
                 add_text_child(parent_list, token->lexeme);
@@ -123,27 +184,13 @@ void parse_children_nodes(LinkList *parent_list, enum ASTNodeType parent_type)
             case TKN_SPACE: add_text_child(parent_list, " "); break;
             case TKN_ATERISK:
             case TKN_UNDERSCORE: {
-                if(!lexer_is_n_tkn(TKN_ATERISK, 0) && !lexer_is_n_tkn(TKN_UNDERSCORE, 0)) {
-                    // ITALIC
-
-                    ItalicNode *italic = malloc(sizeof(ItalicNode));
-                    italic->children = list_create();
-                    parse_children_nodes(italic->children, AST_ITALIC_NODE);
-                    add_child_node(parent_list, AST_ITALIC_NODE, italic);
-                    break;
+                if(lexer_is_n_tkn(token->type, 0)) {
+                    // consume the second aterisk or underscore
+                    lexer_adv_tkn_cursor(1);
+                    parse_bold(parent_list, token->type);
+                } else {
+                    parse_italic(parent_list, token->type);
                 }
-
-                lexer_adv_tkn_cursor(1);
-
-                if(parent_type == AST_BOLD_NODE) {
-                    return;
-                }
-
-                // BOLD
-                BoldNode *bold = malloc(sizeof(BoldNode));
-                bold->children = list_create();
-                parse_children_nodes(bold->children, AST_BOLD_NODE);
-                add_child_node(parent_list, AST_BOLD_NODE, bold);
             } break;
             case TKN_EOF:
                 UNREACHABLE("END_OF_FILE reached");
@@ -165,7 +212,7 @@ ASTNode *parse_file(const char *file_path)
     body_node->children = list_create();
     ast_node->data = body_node;
 
-    parse_children_nodes(body_node->children, AST_BODY_NODE);
+    parse_children_nodes(body_node->children, &predicate_body);
 
     return ast_node;
 }

@@ -7,10 +7,21 @@
 ####### A header with 7 hashes should be treated as text
 If the # is not the first character, it should be treated as text.
 
-*This is italic using aterisks*
-_This is also italic using underscores_
+*Italic with aterisks*
+_Italic with underscores_
+No *italic
+*No Italic_
 
-# *This is a title with italic in it*
+# *Header and Italic*
 
-**This is bold text using aterisks**
-__This is bold text using underscores__
+**Bold with aterisks**
+__Bold with underscores__
+
+No **Bold
+**No Bold__
+
+***Bold and Italic***
+**** Should be text
+** Should be text
+
+# ***Header, Bold, and Italic***
